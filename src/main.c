@@ -1,123 +1,104 @@
-// main.c
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
+#include "lexer.h"
+#include "parser.h"
+#include "ast.h"
 
-// ---------------------------------
-// 词法分析器 (Lexical Analyzer) 部分
-// ---------------------------------
+// -----------
+// 调试与清理函数
+// -----------
 
-// 1. 定义 Token 类型
-typedef enum {
-    TOKEN_INT,      // 整数字面量
-    TOKEN_LBRACE,   // {
-    TOKEN_RBRACE,   // }
-    TOKEN_EOF,      // 文件结束符 (End of File)
-    TOKEN_UNKNOWN   // 未知类型
-} TokenType;
+/**
+ * @brief 递归地打印抽象语法树 (AST)。
+ * @param node 要打印的 AST 节点。
+ * @param indent 当前的缩进级别，用于美化输出。
+ */
+void print_ast(ASTNode* node, int indent) {
+    if (node == NULL) return;
 
-// 2. 定义 Token 结构体
-typedef struct {
-    TokenType type; // Token 的类型
-    char* value;    // Token 的原始值 (例如 "123", "{")
-} Token;
+    for (int i = 0; i < indent; i++) printf("  ");
 
-// 全局变量，用于指向当前正在分析的源代码位置
-char* source_code;
-int current_pos = 0;
-
-// 函数：创建一个新的 Token
-Token* create_token(TokenType type, char* value) {
-    Token* token = (Token*)malloc(sizeof(Token));
-    token->type = type;
-    token->value = value;
-    return token;
-}
-
-// 函数：获取下一个 Token
-// 这是你需要实现的核心部分！
-Token* get_next_token() {
-    // 当我们读到源代码的末尾时，就返回 EOF Token
-    if (source_code[current_pos] == '\0') {
-        return create_token(TOKEN_EOF, "");
-    }
-
-    // TODO: 跳过所有的空白字符 (空格, 换行, 制表符等)
-    // 你可以使用 isspace() 函数
-    // while (...) { ... }
-    while(isspace(source_code[current_pos])){
-        current_pos++;
-    }
-
-    // TODO: 识别左大括号 '{'
-    if (source_code[current_pos] == '{') {
-        current_pos++;
-        return create_token(TOKEN_LBRACE, "{");
-    }
-
-    // TODO: 识别右大括号 '}'
-    // if (...) { ... }
-    if (source_code[current_pos] == '}') {
-        current_pos++;
-        return create_token(TOKEN_RBRACE, "}");
-    }
-
-
-    // TODO: 识别一个或多个连续的数字，并将其作为一个整数 Token
-    // 你可以使用 isdigit() 函数
-    if (isdigit(source_code[current_pos])) {
-    //     ...
-    //     // 你需要记录数字的起始位置，然后找到结束位置
-    //     // 截取这部分字符串，并创建一个 TOKEN_INT 类型的 Token
-        int start = current_pos;
-        while (isdigit(source_code[current_pos])){
-            current_pos++;
+    switch (node->type) {
+        case NODE_BLOCK_STATEMENT: {
+            printf("BlockStatement:\n");
+            BlockStatementNode* block = (BlockStatementNode*)node;
+            for (int i = 0; i < block->count; i++) {
+                // 递归打印代码块中的每一个语句
+                print_ast(block->statements[i], indent + 1);
+            }
+            break;
         }
-        int len = current_pos - start;
-        char* num_str = (char*)malloc(len + 1);
-        strncpy(num_str, source_code + start, len);
-        num_str[len] = '\0'; // 手动添加字符串结束符
-        return create_token(TOKEN_INT, num_str);
+        case NODE_NUMERIC_LITERAL: {
+            NumericLiteralNode* num_node = (NumericLiteralNode*)node;
+            printf("NumericLiteral: %s\n", num_node->value);
+            break;
+        }
+        default:
+            printf("Unknown Node\n");
     }
-
-    // 如果以上都不是，那么就是一个我们无法识别的 Token
-    current_pos++;
-    return create_token(TOKEN_UNKNOWN, "");
 }
 
+/**
+ * @brief 递归地释放整个抽象语法树 (AST) 的内存。
+ *
+ * 这是一个非常重要的函数，用于防止内存泄漏。
+ * 它必须以“后序遍历”的方式工作：先释放所有子节点，然后释放父节点本身。
+ * @param node 要释放的 AST 树的根节点。
+ */
+void free_ast(ASTNode* node) {
+    if (node == NULL) return;
 
-// ---------------------------------
-// 主函数 (main) 部分
-// ---------------------------------
+    switch (node->type) {
+        case NODE_BLOCK_STATEMENT: {
+            BlockStatementNode* block = (BlockStatementNode*)node;
+            // 1. 先递归地释放代码块中的每一个语句（子节点）
+            for (int i = 0; i < block->count; i++) {
+                free_ast(block->statements[i]);
+            }
+            // 2. 释放存储语句指针的数组本身
+            free(block->statements);
+            break; // 在 switch 中不要忘了 break!
+        }
+        case NODE_NUMERIC_LITERAL: {
+            NumericLiteralNode* num_node = (NumericLiteralNode*)node;
+            // 1. 释放数字字符串 `value` 的内存
+            //    这块内存是在词法分析器中为数字 malloc 的
+            free(num_node->value);
+            break;
+        }
+        default:
+            // 其他节点类型目前没有需要特殊释放的内存
+            break;
+    }
+
+    // 最后，释放节点结构体本身
+    free(node);
+}
+
+// -----------
+// 主函数
+// -----------
+
 int main() {
-    // 我们要分析的源代码
-    source_code = "{ 123 }";
+    char* source_code = "{ 123 }";
     printf("正在分析: %s\n", source_code);
+    
+    // 1. 初始化词法分析器，传入源代码
+    lexer_init(source_code);
 
-    // 不断调用 get_next_token() 直到我们拿到 EOF Token
-    while (1) {
-        Token* token = get_next_token();
-        
-        printf("Token 类型: %d, 值: '%s'\n", token->type, token->value);
+    // 2. 调用语法分析器，生成 AST
+    // printf("开始语法分析...\n");
+    ASTNode* root = parse();
+    printf("语法分析完成！\n");
 
-        // 检查是否到达文件末尾
-        if (token->type == TOKEN_EOF) {
-            free(token); // 释放最后一个 EOF token
-            break;       // 然后安全退出循环
-        }
+    // 3. 打印 AST 来验证结果
+    printf("\n生成的 AST 树:\n");
+    print_ast(root, 0);
 
-        // 核心修正：处理内存泄漏
-        // 如果 Token 是一个整数字面量，它的 value 是通过 malloc 创建的，需要单独释放
-        if (token->type == TOKEN_INT) {
-            free(token->value);
-        }
-
-        // 最后释放 Token 结构体本身
-        // 对于 LBRACE 和 RBRACE，它们的 value 指向字符串字面量，不需要也不能 free
-        free(token);
-    }
+    // 4. 释放整个 AST 树的内存
+    // printf("\n开始释放 AST 内存...\n");
+    free_ast(root);
+    printf("内存已释放。\n");
 
     return 0;
 }
