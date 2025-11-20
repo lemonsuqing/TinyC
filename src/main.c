@@ -75,30 +75,53 @@ void free_ast(ASTNode* node) {
     free(node);
 }
 
+const char* token_type_to_string(TokenType type) {
+    switch (type) {
+        case TOKEN_INT: return "INT";
+        case TOKEN_LBRACE: return "LBRACE";
+        case TOKEN_RBRACE: return "RBRACE";
+        case TOKEN_EOF: return "EOF";
+        case TOKEN_IDENTIFIER: return "IDENTIFIER";
+        case TOKEN_KEYWORD: return "KEYWORD";
+        case TOKEN_LPAREN: return "LPAREN";
+        case TOKEN_RPAREN: return "RPAREN";
+        case TOKEN_SEMICOLON: return "SEMICOLON";
+        default: return "UNKNOWN";
+    }
+}
+
 // -----------
 // 主函数
 // -----------
 
 int main() {
-    char* source_code = "{ 123 }";
-    printf("正在分析: %s\n", source_code);
+    char* source_code = "int main() { return 0; }";
+    printf("正在分析: %s\n\n", source_code);
     
-    // 1. 初始化词法分析器，传入源代码
     lexer_init(source_code);
 
-    // 2. 调用语法分析器，生成 AST
-    // printf("开始语法分析...\n");
-    ASTNode* root = parse();
-    printf("语法分析完成！\n");
+    printf("--- Lexer 输出 ---\n");
+    
+    // 使用更安全的 while(1) 循环结构
+    while (1) {
+        Token* token = get_next_token();
+        
+        printf("Token: %-12s, Value: '%s'\n", token_type_to_string(token->type), token->value);
 
-    // 3. 打印 AST 来验证结果
-    printf("\n生成的 AST 树:\n");
-    print_ast(root, 0);
+        // 核心修正：在检查完 token 类型后，再决定是否释放和退出
+        if (token->type == TOKEN_EOF) {
+            free(token); // 释放最后一个 EOF token
+            break;       // 然后安全地退出循环
+        }
 
-    // 4. 释放整个 AST 树的内存
-    // printf("\n开始释放 AST 内存...\n");
-    free_ast(root);
-    printf("内存已释放。\n");
+        // 释放为 token 的 value 分配的内存
+        if (token->type == TOKEN_INT || token->type == TOKEN_IDENTIFIER || token->type == TOKEN_KEYWORD) {
+            free(token->value);
+        }
+        
+        // 释放 token 结构体本身
+        free(token);
+    }
 
     return 0;
 }

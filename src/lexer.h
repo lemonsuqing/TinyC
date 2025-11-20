@@ -8,7 +8,12 @@ typedef enum {
     TOKEN_LBRACE,
     TOKEN_RBRACE,
     TOKEN_EOF,
-    TOKEN_UNKNOWN
+    TOKEN_UNKNOWN,
+    TOKEN_IDENTIFIER,   // 标识符, e.g., main, my_variable
+    TOKEN_KEYWORD,      // 关键字, e.g., int, return
+    TOKEN_LPAREN,       // (
+    TOKEN_RPAREN,       // )
+    TOKEN_SEMICOLON     // ;
 } TokenType;
 
 typedef struct {
