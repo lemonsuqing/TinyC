@@ -33,16 +33,16 @@ all: $(BINDIR)/$(EXECUTABLE)
 
 # 链接规则: 如何从目标文件 (.o) 生成最终的可执行文件
 $(BINDIR)/$(EXECUTABLE): $(OBJECTS)
-	@echo "==> Linking..."
+# 	@echo "==> Linking..."
 	@$(CC) $(LDFLAGS) -o $@ $^
-	@echo "==> TinyC compiler is ready at $(BINDIR)/$(EXECUTABLE)"
+# 	@echo "==> TinyC compiler is ready at $(BINDIR)/$(EXECUTABLE)"
 
 # 编译规则: 如何从源文件 (.c) 生成目标文件 (.o)
 # $@ 代表目标文件 (e.g., bin/main.o)
 # $< 代表第一个依赖文件 (e.g., src/main.c)
 $(BINDIR)/%.o: $(SRCDIR)/%.c
 	@mkdir -p $(BINDIR) # 如果 bin 目录不存在，则创建它
-	@echo "==> Compiling $<..."
+# 	@echo "==> Compiling $<..."
 	@$(CC) $(CFLAGS) -c $< -o $@
 
 # 运行目标
