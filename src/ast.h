@@ -4,11 +4,14 @@
 #include <stdlib.h> // 为了 size_t
 
 typedef enum {
-    NODE_NUMERIC_LITERAL, // 数字字面量
+    NODE_NUMERIC_LITERAL,   // 数字字面量
     NODE_BLOCK_STATEMENT,   // 代码块语句 { ... }
     NODE_PROGRAM,           // 程序的根节点
     NODE_FUNCTION_DECL,     // 函数声明
-    NODE_RETURN_STATEMENT   // return 语句
+    NODE_RETURN_STATEMENT,  // return 语句
+    NODE_VAR_DECL,          // 变量声明
+    NODE_ASSIGN,            // 赋值表达式
+    NODE_IDENTIFIER,        // 标识符 (当它作为一个值被使用时)
 } NodeType;
 
 // AST 节点的通用结构体
@@ -52,16 +55,30 @@ typedef struct {
     int count; // 声明的数量
 } ProgramNode;
 
+// 标识符节点 (e.g., 在 "return x;" 中的 x)
+typedef struct {
+    NodeType type; // 值为 NODE_IDENTIFIER
+    char* name;
+} IdentifierNode;
+
+// 变量声明节点 (e.g., "int x = 5;")
+typedef struct {
+    NodeType type; // 值为 NODE_VAR_DECL
+    char* name;
+    ASTNode* initial_value; // 赋值的初始值表达式
+} VarDeclNode;
 
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
 void add_statement_to_block(BlockStatementNode* block, ASTNode* statement);
-
-// 添加新工厂函数的声明
 ProgramNode* create_program_node();
 FunctionDeclarationNode* create_function_declaration_node(char* name, BlockStatementNode* body);
 ReturnStatementNode* create_return_statement_node(ASTNode* argument);
 void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl);
+
+// 新工厂函数
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value);
+IdentifierNode* create_identifier_node(char* name);
 
 #endif // AST_H

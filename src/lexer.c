@@ -75,6 +75,11 @@ Token* get_next_token() {
         return create_token(TOKEN_SEMICOLON, ";");
     }
 
+    if (source_code[current_pos] == '=') {
+        current_pos++;
+        return create_token(TOKEN_ASSIGN, "=");
+    }
+
 
     // 2. 识别标识符和关键字
     // C 语言的标识符以字母或下划线开头

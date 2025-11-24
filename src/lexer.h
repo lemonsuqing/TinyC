@@ -13,7 +13,8 @@ typedef enum {
     TOKEN_KEYWORD,      // 关键字, e.g., int, return
     TOKEN_LPAREN,       // (
     TOKEN_RPAREN,       // )
-    TOKEN_SEMICOLON     // ;
+    TOKEN_SEMICOLON,    // ;
+    TOKEN_ASSIGN,       // = :赋值
 } TokenType;
 
 typedef struct {

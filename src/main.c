@@ -52,6 +52,7 @@ void print_ast(ASTNode* node, int indent) {
     }
 }
 
+// 这是一个完整且正确的 free_ast 函数
 void free_ast(ASTNode* node) {
     if (node == NULL) return;
 
@@ -66,13 +67,8 @@ void free_ast(ASTNode* node) {
         }
         case NODE_FUNCTION_DECL: {
             FunctionDeclarationNode* func = (FunctionDeclarationNode*)node;
-            free(func->name); // 释放 strdup 复制的函数名
+            free(func->name);
             free_ast((ASTNode*)func->body);
-            break;
-        }
-        case NODE_RETURN_STATEMENT: {
-            ReturnStatementNode* ret = (ReturnStatementNode*)node;
-            free_ast(ret->argument);
             break;
         }
         case NODE_BLOCK_STATEMENT: {
@@ -81,6 +77,22 @@ void free_ast(ASTNode* node) {
                 free_ast(block->statements[i]);
             }
             free(block->statements);
+            break;
+        }
+        case NODE_VAR_DECL: { // <--- 新增 case
+            VarDeclNode* var_decl = (VarDeclNode*)node;
+            free(var_decl->name); // 释放变量名
+            free_ast(var_decl->initial_value); // 递归释放初始值
+            break;
+        }
+        case NODE_RETURN_STATEMENT: {
+            ReturnStatementNode* ret = (ReturnStatementNode*)node;
+            free_ast(ret->argument);
+            break;
+        }
+        case NODE_IDENTIFIER: { // <--- 新增 case
+            IdentifierNode* ident = (IdentifierNode*)node;
+            free(ident->name); // 释放标识符名
             break;
         }
         case NODE_NUMERIC_LITERAL: {
@@ -98,7 +110,7 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { return 0; }";
+    char* source_code = "int main() { int x = 5; return x; }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

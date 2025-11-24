@@ -45,13 +45,40 @@ static void eat(TokenType type) {
 
 // 解析表达式。目前，我们的“表达式”只能是一个数字字面量。
 ASTNode* parse_expression() {
-    // 检查当前token是否为数字
+    ASTNode* node = NULL;
     if (current_token->type == TOKEN_INT) {
-        return (ASTNode*)create_numeric_literal(current_token->value);
+        // 直接传递指针，AST接管所有权
+        node = (ASTNode*)create_numeric_literal(current_token->value);
+    } else if (current_token->type == TOKEN_IDENTIFIER) {
+        // 直接传递指针，AST接管所有权
+        node = (ASTNode*)create_identifier_node(current_token->value);
+    } else {
+        fprintf(stderr, "Syntax Error: Expected an expression\n");
+        exit(1);
     }
-    // 如果不是数字，则是语法错误
-    fprintf(stderr, "Syntax Error: Expected an expression (e.g., a number), but got token type %d\n", current_token->type);
-    exit(1);
+    // 关键：在创建节点后，才消费掉对应的token
+    eat(current_token->type);
+    return node;
+}
+
+// 解析变量声明语句: "int" <identifier> "=" <expression> ";"
+ASTNode* parse_variable_declaration() {
+    eat(TOKEN_KEYWORD); // 消费 "int"
+
+    // --- 核心修正：不再使用 strdup ---
+    // 1. 先保存指针
+    char* variable_name = current_token->value;
+    // 2. 再消费 token
+    eat(TOKEN_IDENTIFIER);
+
+    eat(TOKEN_ASSIGN);
+
+    ASTNode* expr = parse_expression(); // parse_expression 内部已经消费了它自己的token
+
+    eat(TOKEN_SEMICOLON);
+
+    // 3. 将保存的指针传递给 AST 节点
+    return (ASTNode*)create_var_decl_node(variable_name, expr);
 }
 
 // 解析返回语句: "return" <expression> ";"
@@ -62,16 +89,12 @@ ASTNode* parse_return_statement() {
 
     // 2. 解析 return 后面跟着的表达式
     ASTNode* argument = parse_expression();
-    // 消费掉 INT Token
-    eat(TOKEN_INT);
 
     // 3. 消费句末的分号
     eat(TOKEN_SEMICOLON);
 
     // 4. 创建并返回一个 ReturnStatementNode
     return (ASTNode*)create_return_statement_node(argument);
-
-    return NULL; // 占位符
 }
 
 // 解析一个语句。目前一个语句只能是 "return" 语句。
@@ -81,6 +104,10 @@ ASTNode* parse_statement() {
     if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "return") == 0) {
         // 如果是，就调用 parse_return_statement()
         return parse_return_statement();
+    }
+    // 如果是 "int" 关键字，说明这是一个变量声明
+    if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "int") == 0) {
+        return parse_variable_declaration();
     }
     
     // 如果不是我们认识的语句，就报错
@@ -105,24 +132,20 @@ ASTNode* parse_block_statement() {
 
 // 解析函数声明: "int" <identifier> "(" ")" <block_statement>
 FunctionDeclarationNode* parse_function_declaration() {
-    // TODO (3/5): 完成函数声明的解析
-    // 1. 消费 "int" 关键字
-    eat(TOKEN_KEYWORD);
+    eat(TOKEN_KEYWORD); // 消费 "int"
 
-    // 2. 获取函数名
-    char* function_name = strdup(current_token->value); // 使用 strdup 复制一份字符串
+    // --- 核心修正：不再使用 strdup ---
+    // 1. 先保存指针
+    char* function_name = current_token->value;
+    // 2. 再消费 token
     eat(TOKEN_IDENTIFIER);
 
-    // 3. 消费左右括号
     eat(TOKEN_LPAREN);
     eat(TOKEN_RPAREN);
 
-    // 4. 解析函数体
     BlockStatementNode* body = (BlockStatementNode*)parse_block_statement();
     
-    // 5. 创建并返回 FunctionDeclarationNode
-    // return create_function_declaration_node(...);
-
+    // 3. 将保存的指针传递给 AST 节点
     return create_function_declaration_node(function_name, body);
 }
 
@@ -205,4 +228,21 @@ void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl
     prog->declarations = realloc(prog->declarations, prog->count * sizeof(FunctionDeclarationNode*));
     if (!prog->declarations) { exit(1); }
     prog->declarations[prog->count - 1] = decl;
+}
+
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value){
+    VarDeclNode* node = (VarDeclNode*)malloc(sizeof(VarDeclNode));
+    if (!node) { exit(1); }
+    node->type = NODE_VAR_DECL;
+    node->name = name;                      // 接管 name 指针
+    node->initial_value = initial_value;    // 接管 body 指针
+    return node;
+}
+
+IdentifierNode* create_identifier_node(char* name){
+    IdentifierNode* node = (IdentifierNode*)malloc(sizeof(IdentifierNode));
+    if (!node) { exit(1); }
+    node->type = NODE_IDENTIFIER;
+    node->name = name;
+    return node;
 }
