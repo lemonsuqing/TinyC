@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "ast.h"
+#include "codegen.h"
 
 // -----------
 // 调试与清理函数
@@ -98,18 +99,21 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = "int main() { return 0; }";
-    printf("--- 正在分析 ---\n%s\n\n", source_code);
+    // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);
 
     ASTNode* root = parse();
-    printf("语法分析完成！\n\n");
+    // printf("语法分析完成！\n\n");
 
-    printf("--- 生成的 AST 树 ---\n");
-    print_ast(root, 0);
+    // printf("--- 生成的 AST 树 ---\n");
+    // print_ast(root, 0);
+
+    // printf("--- Generating Assembly Code ---\n");
+    codegen(root);
 
     free_ast(root);
-    printf("内存已释放。\n");
+    // printf("内存已释放。\n");
 
     return 0;
 }

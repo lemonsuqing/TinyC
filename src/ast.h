@@ -31,9 +31,7 @@ typedef struct {
 } BlockStatementNode;
 
 
-// 定义新的 AST 节点结构体 ---
-
-// Return 语句节点, e.g., "return 0;"
+// Return 语句节点
 typedef struct {
     NodeType type; // 值为 NODE_RETURN_STATEMENT
     struct ASTNode* argument; // return 后面跟着的表达式
