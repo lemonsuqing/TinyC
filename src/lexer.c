@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
-#include "lexer.h" // 引入我们自己的头文件
+#include "lexer.h"
 
 // --- 从 main.c 移动过来的 ---
 
@@ -78,6 +78,15 @@ Token* get_next_token() {
     if (source_code[current_pos] == '=') {
         current_pos++;
         return create_token(TOKEN_ASSIGN, "=");
+    }
+
+    if (source_code[current_pos] == '+') {
+        current_pos++;
+        return create_token(TOKEN_PLUS, "+");
+    }
+    if (source_code[current_pos] == '-') {
+        current_pos++;
+        return create_token(TOKEN_MINUS, "-");
     }
 
 

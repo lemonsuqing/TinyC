@@ -2,6 +2,7 @@
 #define AST_H
 
 #include <stdlib.h> // 为了 size_t
+#include "lexer.h"
 
 typedef enum {
     NODE_NUMERIC_LITERAL,   // 数字字面量
@@ -12,6 +13,7 @@ typedef enum {
     NODE_VAR_DECL,          // 变量声明
     NODE_ASSIGN,            // 赋值表达式
     NODE_IDENTIFIER,        // 标识符 (当它作为一个值被使用时)
+    NODE_BINARY_OP,         // 二元操作, e.g., +, -
 } NodeType;
 
 // AST 节点的通用结构体
@@ -68,6 +70,14 @@ typedef struct {
     ASTNode* initial_value; // 赋值的初始值表达式
 } VarDeclNode;
 
+
+typedef struct {
+    NodeType type;      // 值为 NODE_BINARY_OP
+    struct ASTNode* left;   // 左边的表达式
+    struct ASTNode* right;  // 右边的表达式
+    TokenType op;       // 操作符 (e.g., TOKEN_PLUS)
+} BinaryOpNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -76,9 +86,10 @@ ProgramNode* create_program_node();
 FunctionDeclarationNode* create_function_declaration_node(char* name, BlockStatementNode* body);
 ReturnStatementNode* create_return_statement_node(ASTNode* argument);
 void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl);
-
-// 新工厂函数
 VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value);
 IdentifierNode* create_identifier_node(char* name);
+
+// 新工厂函数
+BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
 
 #endif // AST_H

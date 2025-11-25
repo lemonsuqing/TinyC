@@ -176,9 +176,38 @@ static void codegen_numeric_literal(NumericLiteralNode* node) {
     // 任务是把这个数字的值放入返回值寄存器 %eax 中。
     // 使用 movl 指令来完成这个任务。
     // 提示：node->value 是一个字符串，所以你需要使用 %s 来打印它。
-    printf("  mov eax, %s\n", node->value);
+    printf("  mov rax, %s\n", node->value);
 }
 
+// 为 "Binary Operation" 节点生成代码
+static void codegen_binary_op(BinaryOpNode* node) {
+    // 1. 生成右子树的代码 (计算 B)
+    codegen_node(node->right);
+    //    现在 B 的结果在 eax 中
+
+    // 2. 将 B 的结果压入栈中保存
+    printf("  push rax\n");
+
+    // 3. 生成左子树的代码 (计算 A)
+    codegen_node(node->left);
+    //    现在 A 的结果在 eax 中
+
+    // 4. 将 B 的结果从栈中弹出到 rdi
+    printf("  pop rdi\n");
+
+    // 5. 根据操作符，生成对应的汇编指令
+    switch (node->op) {
+        case TOKEN_PLUS:
+            printf("  add rax, rdi\n");
+            break;
+        case TOKEN_MINUS:
+            printf("  sub rax, rdi\n");
+            break;
+        default:
+            fprintf(stderr, "Codegen: Unsupported binary operator\n");
+            exit(1);
+    }
+}
 
 /**
  * @brief 递归的 AST 节点访问者函数。
@@ -210,6 +239,9 @@ static void codegen_node(ASTNode* node) {
             break;
         case NODE_IDENTIFIER:
             codegen_identifier((IdentifierNode*)node);
+            break;
+        case NODE_BINARY_OP:
+            codegen_binary_op((BinaryOpNode*)node);
             break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);

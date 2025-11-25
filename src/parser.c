@@ -43,22 +43,48 @@ static void eat(TokenType type) {
 // 解析函数 - 从具体到抽象 (自底向上)
 // -----------
 
-// 解析表达式。目前，我们的“表达式”只能是一个数字字面量。
-ASTNode* parse_expression() {
+// 新增一个解析 "项" 的函数，目前一个项就是一个数字或变量
+ASTNode* parse_term() {
     ASTNode* node = NULL;
-    if (current_token->type == TOKEN_INT) {
-        // 直接传递指针，AST接管所有权
-        node = (ASTNode*)create_numeric_literal(current_token->value);
-    } else if (current_token->type == TOKEN_IDENTIFIER) {
-        // 直接传递指针，AST接管所有权
-        node = (ASTNode*)create_identifier_node(current_token->value);
+    char* value_ptr = current_token->value;
+    TokenType type = current_token->type;
+
+    if (type == TOKEN_INT) {
+        node = (ASTNode*)create_numeric_literal(value_ptr);
+    } else if (type == TOKEN_IDENTIFIER) {
+        node = (ASTNode*)create_identifier_node(value_ptr);
     } else {
-        fprintf(stderr, "Syntax Error: Expected an expression\n");
+        fprintf(stderr, "Syntax Error: Expected a number or an identifier\n");
         exit(1);
     }
-    // 关键：在创建节点后，才消费掉对应的token
-    eat(current_token->type);
+    eat(type);
     return node;
+}
+
+// 解析表达式。
+ASTNode* parse_expression() {
+    // 1. 先解析左边的一个 "term"
+    ASTNode* left = parse_term();
+
+    // 2. 循环检查后面是否跟着 '+' 或 '-'
+    while (current_token->type == TOKEN_PLUS || current_token->type == TOKEN_MINUS) {
+        // a. 获取操作符 token
+        TokenType op = current_token->type;
+        // b. 消费掉操作符 token
+        eat(op);
+        // c. 解析右边的 "term"
+        ASTNode* right = parse_term();
+        
+        // d. 将左边的节点、操作符、右边的节点，组合成一个新的、更大的左节点
+        //    这样，下一次循环时，这个新的组合体就成了新的 "left"
+        //    例如，解析 1 + 2 + 3 时：
+        //    - 第一次循环后, left 变成 (1 + 2)
+        //    - 第二次循环时, left 是 (1 + 2), right 是 3, 最终 left 变成 ((1 + 2) + 3)
+        left = (ASTNode*)create_binary_op_node(left, op, right);
+    }
+
+    // 3. 返回最终构建好的表达式树的根节点
+    return left;
 }
 
 // 解析变量声明语句: "int" <identifier> "=" <expression> ";"
@@ -230,6 +256,7 @@ void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl
     prog->declarations[prog->count - 1] = decl;
 }
 
+// 创建一个 “变量声明” 节点
 VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value){
     VarDeclNode* node = (VarDeclNode*)malloc(sizeof(VarDeclNode));
     if (!node) { exit(1); }
@@ -239,10 +266,22 @@ VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value){
     return node;
 }
 
+// 创建一个 “标识符” 节点
 IdentifierNode* create_identifier_node(char* name){
     IdentifierNode* node = (IdentifierNode*)malloc(sizeof(IdentifierNode));
     if (!node) { exit(1); }
     node->type = NODE_IDENTIFIER;
     node->name = name;
+    return node;
+}
+
+// 创建一个 “二元运算” 节点
+BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right){
+    BinaryOpNode* node = (BinaryOpNode*)malloc(sizeof(BinaryOpNode));
+    if (!node) { exit(1); }
+    node->type = NODE_BINARY_OP;
+    node->left = left;
+    node->op = op;
+    node->right = right;
     return node;
 }

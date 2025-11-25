@@ -110,7 +110,7 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { int x = 5; return x; }";
+    char* source_code = "int main() { int x = 3; int y = 2; return x + y; }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

@@ -15,6 +15,8 @@ typedef enum {
     TOKEN_RPAREN,       // )
     TOKEN_SEMICOLON,    // ;
     TOKEN_ASSIGN,       // = :赋值
+    TOKEN_PLUS,         // +
+    TOKEN_MINUS,        // -
 } TokenType;
 
 typedef struct {
