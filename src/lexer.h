@@ -18,6 +18,8 @@ typedef enum {
     TOKEN_PLUS,         // +
     TOKEN_MINUS,        // -
     TOKEN_GT,           // > (大于)
+    TOKEN_STAR,         // *
+    TOKEN_SLASH,        // /
 } TokenType;
 
 typedef struct {

@@ -227,6 +227,25 @@ static void codegen_binary_op(BinaryOpNode* node) {
         case TOKEN_GT:
             printf("  cmp rax, rdi\n");
             break;
+        case TOKEN_STAR:
+            printf("  imul rax, rdi\n"); // 有符号乘法: rax = rax * rdi
+            break;
+        case TOKEN_SLASH:
+            // 除法比较特殊：
+            // 被除数在 rax 中 (来自 pop rdi 前的计算结果, 但这里 rax 是左操作数, rdi 是右操作数? 等等)
+            
+            // 让我们理一下栈：
+            // 1. 右操作数 B 计算完 -> push
+            // 2. 左操作数 A 计算完 -> 在 rax 中
+            // 3. pop rdi -> B 在 rdi 中
+            // 此时：rax = A (被除数), rdi = B (除数)
+
+            // idiv 指令是用 rdx:rax (128位) 除以操作数。
+            // 我们只有 64 位的 rax，所以需要把 rax 的符号位扩展到 rdx 中。
+            // cqo 指令就是做这个的 (Convert Quad-word to Oct-word)。
+            printf("  cqo\n"); 
+            printf("  idiv rdi\n"); // rax = rdx:rax / rdi
+            break;
         default:
             fprintf(stderr, "Codegen: Unsupported binary operator\n");
             exit(1);
@@ -331,6 +350,7 @@ static void codegen_node(ASTNode* node) {
         case NODE_WHILE_STATEMENT:
             codegen_while_statement((WhileStatementNode*)node);
             break;
+        
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
             exit(1);

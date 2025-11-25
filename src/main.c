@@ -125,7 +125,7 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { int x = 5; int sum = 0; while (x > 0) { sum = sum + x; x = x - 1; } return sum; }";
+    char* source_code = "int main() { return (2 + 3) * 4 - 20 / 20; }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

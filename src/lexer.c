@@ -91,6 +91,14 @@ Token* get_next_token() {
     if (source_code[current_pos] == '>') {
         current_pos++; return create_token(TOKEN_GT, ">");
     }
+    if (source_code[current_pos] == '*') {
+        current_pos++;
+        return create_token(TOKEN_STAR, "*");
+    }
+    if (source_code[current_pos] == '/') {
+        current_pos++;
+        return create_token(TOKEN_SLASH, "/");
+    }
 
 
     // 2. 识别标识符和关键字

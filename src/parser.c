@@ -18,6 +18,7 @@ ASTNode* parse_expression();
 ASTNode* parse_block_statement();
 ASTNode* parse_additive_expression();
 ASTNode* parse_term();
+ASTNode* parse_factor();
 ASTNode* parse_if_statement();
 ASTNode* parse_assignment_statement();
 ASTNode* parse_while_statement();
@@ -49,21 +50,51 @@ static void eat(TokenType type) {
 // -----------
 
 // 新增一个解析 "项" 的函数，目前一个项就是一个数字或变量
-ASTNode* parse_term() {
+ASTNode* parse_factor() {
     ASTNode* node = NULL;
     char* value_ptr = current_token->value;
     TokenType type = current_token->type;
 
     if (type == TOKEN_INT) {
         node = (ASTNode*)create_numeric_literal(value_ptr);
-    } else if (type == TOKEN_IDENTIFIER) {
+        eat(TOKEN_INT);
+    } 
+    else if (type == TOKEN_IDENTIFIER) {
         node = (ASTNode*)create_identifier_node(value_ptr);
-    } else {
-        fprintf(stderr, "Syntax Error: Expected a number or an identifier\n");
+        eat(TOKEN_IDENTIFIER);
+    } 
+    else if (type == TOKEN_LPAREN) {
+        // 1. 遇到左括号，先吃掉
+        eat(TOKEN_LPAREN);
+        
+        // 2. 递归调用 parse_expression 来解析括号里面的内容
+        //    这会从最低优先级（加减）重新开始解析，非常完美
+        node = parse_expression();
+        
+        // 3. 解析完里面后，必须期望一个右括号
+        eat(TOKEN_RPAREN);
+    } 
+    else {
+        fprintf(stderr, "Syntax Error: Expected number, identifier or '(', but got token type %d\n", type);
         exit(1);
     }
-    eat(type);
+    
     return node;
+}
+
+// 新增：处理乘法和除法
+ASTNode* parse_term() {
+    // 1. 先解析一个因子 (Factor)
+    ASTNode* left = parse_factor();
+
+    // 2. 只要后面跟着 * 或 /，就继续吃
+    while (current_token->type == TOKEN_STAR || current_token->type == TOKEN_SLASH) {
+        TokenType op = current_token->type;
+        eat(op);
+        ASTNode* right = parse_factor(); // 注意：这里调用的是 parse_factor
+        left = (ASTNode*)create_binary_op_node(left, op, right);
+    }
+    return left;
 }
 
 // 解析表达式。
