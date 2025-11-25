@@ -109,6 +109,12 @@ void free_ast(ASTNode* node) {
             }
             break;
         }
+        case NODE_WHILE_STATEMENT: {
+            WhileStatementNode* while_stmt = (WhileStatementNode*)node;
+            free_ast(while_stmt->condition);
+            free_ast(while_stmt->body);
+            break;
+        }
         default:
             break;
     }
@@ -119,7 +125,7 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { int a = 5; int b = 0; if (a > 10) { b = 1; } else { b = 2; } return b; }";
+    char* source_code = "int main() { int x = 5; int sum = 0; while (x > 0) { sum = sum + x; x = x - 1; } return sum; }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

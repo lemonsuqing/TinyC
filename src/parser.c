@@ -20,6 +20,7 @@ ASTNode* parse_additive_expression();
 ASTNode* parse_term();
 ASTNode* parse_if_statement();
 ASTNode* parse_assignment_statement();
+ASTNode* parse_while_statement();
 
 // -----------
 // 辅助函数
@@ -188,6 +189,11 @@ ASTNode* parse_statement() {
         return parse_if_statement();
     }
 
+    // 如果是 "while" 关键字
+    if (strcmp(current_token->value, "while") == 0) {
+        return parse_while_statement();
+    }
+
     // 注意：赋值语句 (x = 5;) 也是一种语句，我们需要在这里处理
     if (current_token->type == TOKEN_IDENTIFIER) {
         return (ASTNode*)parse_assignment_statement(); // 我们需要一个新的解析函数
@@ -267,6 +273,16 @@ ASTNode* parse_if_statement() {
     //    而 parse_statement() 恰好可以解析这两种情况！
     // 6. 创建并返回一个 IfStatementNode
     return (ASTNode*)create_if_statement_node(condition, body, else_body);
+}
+
+// 解析 while 语句
+ASTNode* parse_while_statement() {
+    eat(TOKEN_KEYWORD); // 消费 "while"
+    eat(TOKEN_LPAREN);
+    ASTNode* condition = parse_expression();
+    eat(TOKEN_RPAREN);
+    ASTNode* body = parse_statement();
+    return (ASTNode*)create_while_statement_node(condition, body);
 }
 
 // -----------
@@ -380,6 +396,7 @@ BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right)
     return node;
 }
 
+// 创建一个 “if” 语句节点
 IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch){
     IfStatementNode* node = (IfStatementNode*)malloc(sizeof(IfStatementNode));
     if (!node) { exit(1); }
@@ -387,5 +404,15 @@ IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, AST
     node->body = body;
     node->condition = condition;
     node->else_branch = else_branch;
+    return node;
+}
+
+// 创建一个 “while” 语句节点
+WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body){
+    WhileStatementNode* node = (WhileStatementNode*)malloc(sizeof(WhileStatementNode));
+    if (!node) { exit(1); }
+    node->type = NODE_WHILE_STATEMENT;
+    node->body = body;
+    node->condition = condition;
     return node;
 }

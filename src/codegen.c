@@ -265,6 +265,32 @@ static void codegen_if_statement(IfStatementNode* node) {
     printf("_L_end_%d:\n", label_id);
 }
 
+// 为 "while Statement" 节点生成代码
+static void codegen_while_statement(WhileStatementNode* node) {
+    int label_id = label_counter++;
+    
+    // 1. 放置“循环开始”标签
+    printf("_L_start_%d:\n", label_id);
+
+    // 2. 生成条件检查代码
+    codegen_node(node->condition);
+
+    // 3. 如果条件不满足，跳出循环 (跳到 end)
+    // 注意：目前的条件只支持 > (TOKEN_GT)。
+    // 如果是 x > 0，汇编比较的是 cmp rax, rdi (即 x, 0)
+    // 如果 x <= 0 (即 jle)，则跳出
+    printf("  jle _L_end_%d\n", label_id);
+
+    // 4. 生成循环体代码
+    codegen_node(node->body);
+
+    // 5. 循环体结束后，无条件跳回开始标签，再次检查条件
+    printf("  jmp _L_start_%d\n", label_id);
+
+    // 6. 放置“循环结束”标签
+    printf("_L_end_%d:\n", label_id);
+}
+
 /**
  * @brief 递归的 AST 节点访问者函数。
  * 
@@ -301,6 +327,9 @@ static void codegen_node(ASTNode* node) {
             break;
         case NODE_IF_STATEMENT:
             codegen_if_statement((IfStatementNode*)node);
+            break;
+        case NODE_WHILE_STATEMENT:
+            codegen_while_statement((WhileStatementNode*)node);
             break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);

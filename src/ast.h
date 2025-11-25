@@ -15,6 +15,7 @@ typedef enum {
     NODE_IDENTIFIER,        // 标识符 (当它作为一个值被使用时)
     NODE_BINARY_OP,         // 二元操作, e.g., +, -
     NODE_IF_STATEMENT,      // if 语句
+    NODE_WHILE_STATEMENT,   // while 语句
 } NodeType;
 
 // AST 节点的通用结构体
@@ -87,6 +88,13 @@ typedef struct {
     struct ASTNode* else_branch; // if 为假时执行的代码 (可以为 NULL)
 } IfStatementNode;
 
+// while 语句节点
+typedef struct {
+    NodeType type;              // 值为 NODE_WHILE_STATEMENT
+    struct ASTNode* condition; // 循环条件
+    struct ASTNode* body;      // 循环体
+} WhileStatementNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -98,8 +106,9 @@ void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl
 VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value);
 IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
+IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);
 
 // 新工厂函数
-IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);
+WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
 
 #endif // AST_H
