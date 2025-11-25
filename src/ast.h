@@ -81,10 +81,10 @@ typedef struct {
 
 // If 语句节点
 typedef struct {
-    NodeType type;          // 值为 NODE_IF_STATEMENT
-    struct ASTNode* condition;  // 条件表达式 (e.g., x > 2)
-    struct ASTNode* body;       // if 为真时执行的语句或代码块
-    // 我们暂时没有 else 分支
+    NodeType type;               // 值为 NODE_IF_STATEMENT
+    struct ASTNode* condition;   // 条件表达式 (e.g., x > 2)
+    struct ASTNode* body;        // if 为真时执行的语句或代码块
+    struct ASTNode* else_branch; // if 为假时执行的代码 (可以为 NULL)
 } IfStatementNode;
 
 // 原有工厂函数
@@ -100,6 +100,6 @@ IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
 
 // 新工厂函数
-IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body);
+IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);
 
 #endif // AST_H

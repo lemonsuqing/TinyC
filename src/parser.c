@@ -240,20 +240,33 @@ FunctionDeclarationNode* parse_function_declaration() {
 // 解析 If 语句: "if" "(" <expression> ")" <statement>
 ASTNode* parse_if_statement() {
     // TODO:
-    // 1. 消费 "if" 关键字
+    // 消费 "if" 关键字
     eat(TOKEN_KEYWORD); // 消费 "if"
-    // 2. 消费 "("
+    // 消费 "("
     eat(TOKEN_LPAREN);
-    // 3. 解析括号内的条件表达式 (调用 parse_expression())
+    // 解析括号内的条件表达式 (调用 parse_expression())
     ASTNode* condition = parse_expression();
-    // 4. 消费 ")"
+    // 消费 ")"
     eat(TOKEN_RPAREN);
-    // 5. 解析 if 为真时要执行的语句 (调用 parse_statement())
+    // 解析 if 为真时要执行的语句 (调用 parse_statement())
     ASTNode* body = parse_statement();
+
+    // 检查是否存在 "else" 分支
+    ASTNode* else_body = NULL;
+
+    // 此时 current_token 指向 then_body 之后的第一个 token
+    // 我们检查它是不是关键字 "else"
+    if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "else") == 0) {
+        // 既然存在 else，我们就要消费它
+        eat(TOKEN_KEYWORD);
+        // 然后解析 else 后面的语句
+        else_body = parse_statement();
+    }
+
     //    注意：这里允许 if (x>2) y=3; 这种单语句，也允许 if (x>2) { ... } 这种代码块
     //    而 parse_statement() 恰好可以解析这两种情况！
     // 6. 创建并返回一个 IfStatementNode
-    return (ASTNode*)create_if_statement_node(condition, body);
+    return (ASTNode*)create_if_statement_node(condition, body, else_body);
 }
 
 // -----------
@@ -367,11 +380,12 @@ BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right)
     return node;
 }
 
-IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body){
+IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch){
     IfStatementNode* node = (IfStatementNode*)malloc(sizeof(IfStatementNode));
     if (!node) { exit(1); }
     node->type = NODE_IF_STATEMENT;
     node->body = body;
     node->condition = condition;
+    node->else_branch = else_branch;
     return node;
 }

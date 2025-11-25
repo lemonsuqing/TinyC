@@ -245,13 +245,24 @@ static void codegen_if_statement(IfStatementNode* node) {
     //    我们生成的 BinaryOpNode (x > 2) 会比较 eax 和 edi
     //    如果 x > 2 为假 (即 x <= 2)，我们就应该跳过 if 的 body
     //    所以我们用 jle (Jump if Less or Equal)
-    printf("  jle  _L_endif_%d\n", label_id);
+    printf("  jle  _L_else_%d\n", label_id);
 
-    // 4. 为 if 的 body 生成代码
+    // 4. 生成 if 为真时的代码
     codegen_node(node->body);
 
-    // 5. 生成结束标签
-    printf("_L_endif_%d:\n", label_id);
+    // 如果执行完了 if 块，必须强制跳转到结束标签，跳过 else 块
+    printf("  jmp  _L_end_%d\n", label_id);
+
+    // 5. 生成 else 标签
+    printf("_L_else_%d:\n", label_id);
+
+    // 6. 如果存在 else 分支，生成它的代码
+    if (node->else_branch != NULL) {
+        codegen_node(node->else_branch);
+    }
+
+    // 生成结束标签
+    printf("_L_end_%d:\n", label_id);
 }
 
 /**

@@ -113,7 +113,8 @@ Token* get_next_token() {
         //    - 如果不是，返回一个 TOKEN_IDENTIFIER 类型的 Token
         if (strcmp(str, "int") == 0 || 
             strcmp(str, "return") == 0 || 
-            strcmp(str, "if") == 0) 
+            strcmp(str, "if") == 0 || 
+            strcmp(str, "else") == 0) 
         {
             return create_token(TOKEN_KEYWORD, str);
         } else {

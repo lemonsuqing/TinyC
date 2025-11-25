@@ -100,6 +100,15 @@ void free_ast(ASTNode* node) {
             free(num_node->value);
             break;
         }
+        case NODE_IF_STATEMENT: { // 假设你有这个 case，如果没有请加上
+            IfStatementNode* if_stmt = (IfStatementNode*)node;
+            free_ast(if_stmt->condition);
+            free_ast(if_stmt->body);
+            if (if_stmt->else_branch != NULL) { // 递归释放 else
+                free_ast(if_stmt->else_branch);
+            }
+            break;
+        }
         default:
             break;
     }
@@ -110,7 +119,7 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { int x = 3; if (x > 4) x = 5; return x; }";
+    char* source_code = "int main() { int a = 5; int b = 0; if (a > 10) { b = 1; } else { b = 2; } return b; }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);
