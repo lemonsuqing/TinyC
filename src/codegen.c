@@ -224,9 +224,6 @@ static void codegen_binary_op(BinaryOpNode* node) {
         case TOKEN_MINUS:
             printf("  sub rax, rdi\n");
             break;
-        case TOKEN_GT:
-            printf("  cmp rax, rdi\n");
-            break;
         case TOKEN_STAR:
             printf("  imul rax, rdi\n"); // 有符号乘法: rax = rax * rdi
             break;
@@ -246,6 +243,29 @@ static void codegen_binary_op(BinaryOpNode* node) {
             printf("  cqo\n"); 
             printf("  idiv rdi\n"); // rax = rdx:rax / rdi
             break;
+        case TOKEN_EQ:
+        case TOKEN_NEQ:
+        case TOKEN_LT:
+        case TOKEN_LE:
+        case TOKEN_GT:
+        case TOKEN_GE:
+            printf("  cmp rax, rdi\n"); // 比较 rax 和 rdi
+            
+            // 根据不同的操作符，设置 al 寄存器 (rax 的低8位)
+            switch (node->op) {
+                case TOKEN_EQ:  printf("  sete al\n"); break;  // Equal
+                case TOKEN_NEQ: printf("  setne al\n"); break; // Not Equal
+                case TOKEN_LT:  printf("  setl al\n"); break;  // Less
+                case TOKEN_LE:  printf("  setle al\n"); break; // Less or Equal
+                case TOKEN_GT:  printf("  setg al\n"); break;  // Greater
+                case TOKEN_GE:  printf("  setge al\n"); break; // Greater or Equal
+                default: break;
+            }
+
+            // 关键一步：将 8 位的 al 零扩展为 64 位的 rax
+            // 这样 rax 的值就变成了真正的 0 或 1
+            printf("  movzb rax, al\n");
+            break;
         default:
             fprintf(stderr, "Codegen: Unsupported binary operator\n");
             exit(1);
@@ -264,7 +284,8 @@ static void codegen_if_statement(IfStatementNode* node) {
     //    我们生成的 BinaryOpNode (x > 2) 会比较 eax 和 edi
     //    如果 x > 2 为假 (即 x <= 2)，我们就应该跳过 if 的 body
     //    所以我们用 jle (Jump if Less or Equal)
-    printf("  jle  _L_else_%d\n", label_id);
+    printf("  cmp rax, 0\n");
+    printf("  je  _L_else_%d\n", label_id); // 如果是 0 (Equal)，跳转到 else
 
     // 4. 生成 if 为真时的代码
     codegen_node(node->body);
@@ -298,7 +319,8 @@ static void codegen_while_statement(WhileStatementNode* node) {
     // 注意：目前的条件只支持 > (TOKEN_GT)。
     // 如果是 x > 0，汇编比较的是 cmp rax, rdi (即 x, 0)
     // 如果 x <= 0 (即 jle)，则跳出
-    printf("  jle _L_end_%d\n", label_id);
+    printf("  cmp rax, 0\n");
+    printf("  je  _L_end_%d\n", label_id); // 如果是 0，跳出循环
 
     // 4. 生成循环体代码
     codegen_node(node->body);

@@ -125,19 +125,22 @@ ASTNode* parse_additive_expression() {
 
 // 新增一个解析比较表达式的函数
 ASTNode* parse_comparison_expression() {
-    // TODO:
-    // 1. 先解析一个加减法级别的表达式
+    // 1. 先解析左侧 (加减法优先)
     ASTNode* left = parse_additive_expression();
-    // 2. 检查后面是否跟着一个比较操作符 (现在只有 '>')
-    if (current_token->type == TOKEN_GT) {
-    //        a. 获取操作符
-    TokenType op = current_token->type;
-    //        b. 消费操作符
-    eat(op);
-    //        c. 解析右边的加减法表达式
-    ASTNode* right = parse_additive_expression();
-    //        d. 将它们组合成一个新的 BinaryOpNode
-    left = (ASTNode*)create_binary_op_node(left, op, right);
+
+    // 2. 检查是否有比较操作符
+    while (current_token->type == TOKEN_GT || current_token->type == TOKEN_LT ||
+           current_token->type == TOKEN_EQ || current_token->type == TOKEN_NEQ ||
+           current_token->type == TOKEN_LE || current_token->type == TOKEN_GE) {
+        
+        TokenType op = current_token->type;
+        eat(op);
+        
+        // 3. 解析右侧
+        ASTNode* right = parse_additive_expression();
+        
+        // 4. 组合
+        left = (ASTNode*)create_binary_op_node(left, op, right);
     }
     // 3. 返回最终的表达式树
     return left;

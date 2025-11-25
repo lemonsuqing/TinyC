@@ -20,6 +20,11 @@ typedef enum {
     TOKEN_GT,           // > (大于)
     TOKEN_STAR,         // *
     TOKEN_SLASH,        // /
+    TOKEN_EQ,           // ==
+    TOKEN_NEQ,          // !=
+    TOKEN_LT,           // < (小于)
+    TOKEN_LE,           // <=
+    TOKEN_GE,           // >=
 } TokenType;
 
 typedef struct {

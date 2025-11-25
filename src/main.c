@@ -100,6 +100,12 @@ void free_ast(ASTNode* node) {
             free(num_node->value);
             break;
         }
+        case NODE_BINARY_OP: {
+            BinaryOpNode* bin = (BinaryOpNode*)node;
+            free_ast(bin->left);
+            free_ast(bin->right);
+            break;
+        }
         case NODE_IF_STATEMENT: { // 假设你有这个 case，如果没有请加上
             IfStatementNode* if_stmt = (IfStatementNode*)node;
             free_ast(if_stmt->condition);
@@ -125,7 +131,7 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { return (2 + 3) * 4 - 20 / 20; }";
+    char* source_code = "int main() { int x = 10; int y = 20; int sum = (x < y) + (x == 10); if (sum == 2) { return 42; } else { return 0; } }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

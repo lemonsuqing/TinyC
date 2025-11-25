@@ -75,11 +75,6 @@ Token* get_next_token() {
         return create_token(TOKEN_SEMICOLON, ";");
     }
 
-    if (source_code[current_pos] == '=') {
-        current_pos++;
-        return create_token(TOKEN_ASSIGN, "=");
-    }
-
     if (source_code[current_pos] == '+') {
         current_pos++;
         return create_token(TOKEN_PLUS, "+");
@@ -88,9 +83,6 @@ Token* get_next_token() {
         current_pos++;
         return create_token(TOKEN_MINUS, "-");
     }
-    if (source_code[current_pos] == '>') {
-        current_pos++; return create_token(TOKEN_GT, ">");
-    }
     if (source_code[current_pos] == '*') {
         current_pos++;
         return create_token(TOKEN_STAR, "*");
@@ -98,6 +90,45 @@ Token* get_next_token() {
     if (source_code[current_pos] == '/') {
         current_pos++;
         return create_token(TOKEN_SLASH, "/");
+    }
+
+    // 处理 = 和 ==
+    if (source_code[current_pos] == '=') {
+        if (source_code[current_pos + 1] == '=') {
+            current_pos += 2;
+            return create_token(TOKEN_EQ, "==");
+        }
+        current_pos++;
+        return create_token(TOKEN_ASSIGN, "=");
+    }
+
+    // 处理 ! 和 != (暂时不处理单目 !, 只处理 !=)
+    if (source_code[current_pos] == '!') {
+        if (source_code[current_pos + 1] == '=') {
+            current_pos += 2;
+            return create_token(TOKEN_NEQ, "!=");
+        }
+        // TODO: 处理单目非 !
+    }
+
+    // 处理 < 和 <=
+    if (source_code[current_pos] == '<') {
+        if (source_code[current_pos + 1] == '=') {
+            current_pos += 2;
+            return create_token(TOKEN_LE, "<=");
+        }
+        current_pos++;
+        return create_token(TOKEN_LT, "<");
+    }
+
+    // 处理 > 和 >=
+    if (source_code[current_pos] == '>') {
+        if (source_code[current_pos + 1] == '=') {
+            current_pos += 2;
+            return create_token(TOKEN_GE, ">=");
+        }
+        current_pos++;
+        return create_token(TOKEN_GT, ">");
     }
 
 
