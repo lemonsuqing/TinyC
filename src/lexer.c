@@ -88,6 +88,9 @@ Token* get_next_token() {
         current_pos++;
         return create_token(TOKEN_MINUS, "-");
     }
+    if (source_code[current_pos] == '>') {
+        current_pos++; return create_token(TOKEN_GT, ">");
+    }
 
 
     // 2. 识别标识符和关键字
@@ -105,14 +108,15 @@ Token* get_next_token() {
         char* str = (char*)malloc(len+1);   // 给单词字符串创建空间
         strncpy(str, source_code + start, len);
         str[len] = '\0';
-        // d. 检查这个字符串是不是关键字 ("int", "return")
+        // d. 检查这个字符串是不是关键字
         //    - 如果是，返回一个 TOKEN_KEYWORD 类型的 Token
         //    - 如果不是，返回一个 TOKEN_IDENTIFIER 类型的 Token
-        if (strcmp(str, "int") == 0 || strcmp(str, "return") == 0) {
-            // 是关键字：返回 TOKEN_KEYWORD 类型，值为关键字字符串
+        if (strcmp(str, "int") == 0 || 
+            strcmp(str, "return") == 0 || 
+            strcmp(str, "if") == 0) 
+        {
             return create_token(TOKEN_KEYWORD, str);
         } else {
-            // 不是关键字：返回 TOKEN_IDENTIFIER 类型，值为标识符字符串
             return create_token(TOKEN_IDENTIFIER, str);
         }
     }

@@ -16,6 +16,10 @@ static void eat(TokenType type);
 ASTNode* parse_statement();
 ASTNode* parse_expression();
 ASTNode* parse_block_statement();
+ASTNode* parse_additive_expression();
+ASTNode* parse_term();
+ASTNode* parse_if_statement();
+ASTNode* parse_assignment_statement();
 
 // -----------
 // 辅助函数
@@ -62,7 +66,7 @@ ASTNode* parse_term() {
 }
 
 // 解析表达式。
-ASTNode* parse_expression() {
+ASTNode* parse_additive_expression() {
     // 1. 先解析左边的一个 "term"
     ASTNode* left = parse_term();
 
@@ -85,6 +89,31 @@ ASTNode* parse_expression() {
 
     // 3. 返回最终构建好的表达式树的根节点
     return left;
+}
+
+// 新增一个解析比较表达式的函数
+ASTNode* parse_comparison_expression() {
+    // TODO:
+    // 1. 先解析一个加减法级别的表达式
+    ASTNode* left = parse_additive_expression();
+    // 2. 检查后面是否跟着一个比较操作符 (现在只有 '>')
+    if (current_token->type == TOKEN_GT) {
+    //        a. 获取操作符
+    TokenType op = current_token->type;
+    //        b. 消费操作符
+    eat(op);
+    //        c. 解析右边的加减法表达式
+    ASTNode* right = parse_additive_expression();
+    //        d. 将它们组合成一个新的 BinaryOpNode
+    left = (ASTNode*)create_binary_op_node(left, op, right);
+    }
+    // 3. 返回最终的表达式树
+    return left;
+}
+
+// 把 parse_expression 作为总入口
+ASTNode* parse_expression() {
+    return parse_comparison_expression();
 }
 
 // 解析变量声明语句: "int" <identifier> "=" <expression> ";"
@@ -123,6 +152,24 @@ ASTNode* parse_return_statement() {
     return (ASTNode*)create_return_statement_node(argument);
 }
 
+ASTNode* parse_assignment_statement() {
+    // 左边是一个已存在的变量
+    char* var_name = current_token->value;
+    ASTNode* left = (ASTNode*)create_identifier_node(var_name);
+    eat(TOKEN_IDENTIFIER);
+
+    eat(TOKEN_ASSIGN);
+    
+    ASTNode* right = parse_expression();
+    
+    // 我们把赋值也建模成一个二元操作节点
+    ASTNode* assignment_node = (ASTNode*)create_binary_op_node(left, TOKEN_ASSIGN, right);
+    
+    eat(TOKEN_SEMICOLON);
+    
+    return assignment_node;
+}
+
 // 解析一个语句。目前一个语句只能是 "return" 语句。
 ASTNode* parse_statement() {
     // TODO (2/5): 完成语句的解析
@@ -134,6 +181,21 @@ ASTNode* parse_statement() {
     // 如果是 "int" 关键字，说明这是一个变量声明
     if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "int") == 0) {
         return parse_variable_declaration();
+    }
+
+    // 如果是 "if" 关键字
+    if (strcmp(current_token->value, "if") == 0) {
+        return parse_if_statement();
+    }
+
+    // 注意：赋值语句 (x = 5;) 也是一种语句，我们需要在这里处理
+    if (current_token->type == TOKEN_IDENTIFIER) {
+        return (ASTNode*)parse_assignment_statement(); // 我们需要一个新的解析函数
+    }
+
+    // 如果是左大括号，说明是一个代码块
+    if (current_token->type == TOKEN_LBRACE) {
+        return parse_block_statement();
     }
     
     // 如果不是我们认识的语句，就报错
@@ -173,6 +235,25 @@ FunctionDeclarationNode* parse_function_declaration() {
     
     // 3. 将保存的指针传递给 AST 节点
     return create_function_declaration_node(function_name, body);
+}
+
+// 解析 If 语句: "if" "(" <expression> ")" <statement>
+ASTNode* parse_if_statement() {
+    // TODO:
+    // 1. 消费 "if" 关键字
+    eat(TOKEN_KEYWORD); // 消费 "if"
+    // 2. 消费 "("
+    eat(TOKEN_LPAREN);
+    // 3. 解析括号内的条件表达式 (调用 parse_expression())
+    ASTNode* condition = parse_expression();
+    // 4. 消费 ")"
+    eat(TOKEN_RPAREN);
+    // 5. 解析 if 为真时要执行的语句 (调用 parse_statement())
+    ASTNode* body = parse_statement();
+    //    注意：这里允许 if (x>2) y=3; 这种单语句，也允许 if (x>2) { ... } 这种代码块
+    //    而 parse_statement() 恰好可以解析这两种情况！
+    // 6. 创建并返回一个 IfStatementNode
+    return (ASTNode*)create_if_statement_node(condition, body);
 }
 
 // -----------
@@ -283,5 +364,14 @@ BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right)
     node->left = left;
     node->op = op;
     node->right = right;
+    return node;
+}
+
+IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body){
+    IfStatementNode* node = (IfStatementNode*)malloc(sizeof(IfStatementNode));
+    if (!node) { exit(1); }
+    node->type = NODE_IF_STATEMENT;
+    node->body = body;
+    node->condition = condition;
     return node;
 }

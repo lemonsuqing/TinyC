@@ -2,6 +2,9 @@
 #include "codegen.h"
 #include <string.h>
 
+// 一个全局计数器，用于生成唯一的标签
+static int label_counter = 0;
+
 // --- 简易符号表 ---
 typedef struct {
     char* name;
@@ -181,6 +184,24 @@ static void codegen_numeric_literal(NumericLiteralNode* node) {
 
 // 为 "Binary Operation" 节点生成代码
 static void codegen_binary_op(BinaryOpNode* node) {
+    if (node->op == TOKEN_ASSIGN) {
+        // 对于 "x = 5", 左边必须是一个可以被赋值的东西 (变量)
+        // 我们假设它是一个 IdentifierNode
+        IdentifierNode* var = (IdentifierNode*)node->left;
+        Symbol* symbol = find_symbol(var->name);
+        if (!symbol) {
+            fprintf(stderr, "Codegen Error: Assigning to undeclared variable '%s'\n", var->name);
+            exit(1);
+        }
+
+        // 1. 生成右边表达式的代码，结果会存入 rax
+        codegen_node(node->right);
+
+        // 2. 将 rax 中的值存入变量在栈上的地址
+        printf("  mov [rbp-%d], rax\n", symbol->stack_offset);
+        return; // 赋值操作到此结束，不需要后续的 push/pop
+    }
+
     // 1. 生成右子树的代码 (计算 B)
     codegen_node(node->right);
     //    现在 B 的结果在 eax 中
@@ -203,10 +224,34 @@ static void codegen_binary_op(BinaryOpNode* node) {
         case TOKEN_MINUS:
             printf("  sub rax, rdi\n");
             break;
+        case TOKEN_GT:
+            printf("  cmp rax, rdi\n");
+            break;
         default:
             fprintf(stderr, "Codegen: Unsupported binary operator\n");
             exit(1);
     }
+}
+
+// 为 "If Statement" 节点生成代码
+static void codegen_if_statement(IfStatementNode* node) {
+    // 1. 为我们这个 if 语句创建一个唯一的标签 ID
+    int label_id = label_counter++;
+    
+    // 2. 为条件表达式生成代码
+    codegen_node(node->condition); // 执行后，比较结果会在 CPU 状态标志中
+
+    // 3. 生成条件跳转指令
+    //    我们生成的 BinaryOpNode (x > 2) 会比较 eax 和 edi
+    //    如果 x > 2 为假 (即 x <= 2)，我们就应该跳过 if 的 body
+    //    所以我们用 jle (Jump if Less or Equal)
+    printf("  jle  _L_endif_%d\n", label_id);
+
+    // 4. 为 if 的 body 生成代码
+    codegen_node(node->body);
+
+    // 5. 生成结束标签
+    printf("_L_endif_%d:\n", label_id);
 }
 
 /**
@@ -242,6 +287,9 @@ static void codegen_node(ASTNode* node) {
             break;
         case NODE_BINARY_OP:
             codegen_binary_op((BinaryOpNode*)node);
+            break;
+        case NODE_IF_STATEMENT:
+            codegen_if_statement((IfStatementNode*)node);
             break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
