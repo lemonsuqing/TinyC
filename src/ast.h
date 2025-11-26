@@ -16,6 +16,7 @@ typedef enum {
     NODE_BINARY_OP,         // 二元操作, e.g., +, -
     NODE_IF_STATEMENT,      // if 语句
     NODE_WHILE_STATEMENT,   // while 语句
+    NODE_UNARY_OP,          // 一元操作, e.g. -x, !x
 } NodeType;
 
 // AST 节点的通用结构体
@@ -95,6 +96,13 @@ typedef struct {
     struct ASTNode* body;      // 循环体
 } WhileStatementNode;
 
+// 一元操作符 结点
+typedef struct {
+    NodeType type;              // 值为 NODE_UNARY_OP
+    TokenType op;               // 操作符: TOKEN_MINUS, TOKEN_BANG 等
+    struct ASTNode* operand;    // 操作数
+} UnaryOpNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -107,8 +115,9 @@ VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value);
 IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
 IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);
+WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
 
 // 新工厂函数
-WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
+UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand);
 
 #endif // AST_H

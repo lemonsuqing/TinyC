@@ -22,6 +22,7 @@ ASTNode* parse_factor();
 ASTNode* parse_if_statement();
 ASTNode* parse_assignment_statement();
 ASTNode* parse_while_statement();
+ASTNode* parse_unary();
 
 // -----------
 // 辅助函数
@@ -82,16 +83,36 @@ ASTNode* parse_factor() {
     return node;
 }
 
+ASTNode* parse_unary() {
+    // 检查当前是不是一元操作符 (+, -, !)
+    if (current_token->type == TOKEN_PLUS || 
+        current_token->type == TOKEN_MINUS || 
+        current_token->type == TOKEN_BANG) {
+        
+        TokenType op = current_token->type;
+        eat(op);
+        
+        // 递归调用自己！因为可能出现 - -5 或 ! ! x 这种情况
+        ASTNode* operand = parse_unary();
+        
+        return (ASTNode*)create_unary_op_node(op, operand);
+    }
+    
+    // 如果不是一元操作符，那就说明是基础因子 (数字/变量/括号)
+    // 把控制权交给下一层
+    return parse_factor();
+}
+
 // 新增：处理乘法和除法
 ASTNode* parse_term() {
     // 1. 先解析一个因子 (Factor)
-    ASTNode* left = parse_factor();
+    ASTNode* left = parse_unary();
 
     // 2. 只要后面跟着 * 或 /，就继续吃
     while (current_token->type == TOKEN_STAR || current_token->type == TOKEN_SLASH) {
         TokenType op = current_token->type;
         eat(op);
-        ASTNode* right = parse_factor(); // 注意：这里调用的是 parse_factor
+        ASTNode* right = parse_unary();
         left = (ASTNode*)create_binary_op_node(left, op, right);
     }
     return left;
@@ -448,5 +469,15 @@ WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* bod
     node->type = NODE_WHILE_STATEMENT;
     node->body = body;
     node->condition = condition;
+    return node;
+}
+
+// 创建一个 一元操作符 节点
+UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand){
+    UnaryOpNode* node = (UnaryOpNode*)malloc(sizeof(UnaryOpNode));
+    if (!node) { exit(1); }
+    node->type = NODE_UNARY_OP;
+    node->op = op;
+    node->operand = operand;
     return node;
 }

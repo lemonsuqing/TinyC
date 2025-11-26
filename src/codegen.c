@@ -332,6 +332,31 @@ static void codegen_while_statement(WhileStatementNode* node) {
     printf("_L_end_%d:\n", label_id);
 }
 
+// 处理一元节点的函数，并在分发器中注册
+static void codegen_unary_op(UnaryOpNode* node) {
+    // 1. 先计算操作数的值，结果会在 rax 中
+    codegen_node(node->operand);
+
+    // 2. 根据操作符处理 rax
+    switch (node->op) {
+        case TOKEN_MINUS: // 负号 (-x)
+            printf("  neg rax\n"); // rax = -rax
+            break;
+        case TOKEN_BANG:  // 逻辑非 (!x)
+            // 逻辑是：如果 rax 是 0，变成 1；如果是非 0，变成 0。
+            printf("  cmp rax, 0\n");
+            printf("  sete al\n");      // 如果相等(是0)，al=1
+            printf("  movzb rax, al\n");// 扩展到 64 位
+            break;
+        case TOKEN_PLUS:  // 正号 (+x)
+            // 什么都不用做，值不变
+            break;
+        default:
+            fprintf(stderr, "Codegen Error: Unknown unary operator\n");
+            exit(1);
+    }
+}
+
 /**
  * @brief 递归的 AST 节点访问者函数。
  * 
@@ -372,7 +397,9 @@ static void codegen_node(ASTNode* node) {
         case NODE_WHILE_STATEMENT:
             codegen_while_statement((WhileStatementNode*)node);
             break;
-        
+        case NODE_UNARY_OP:
+            codegen_unary_op((UnaryOpNode*)node);
+            break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
             exit(1);

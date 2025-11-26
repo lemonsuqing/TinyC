@@ -108,7 +108,9 @@ Token* get_next_token() {
             current_pos += 2;
             return create_token(TOKEN_NEQ, "!=");
         }
-        // TODO: 处理单目非 !
+        // --- 新增：处理单目 ! ---
+        current_pos++;
+        return create_token(TOKEN_BANG, "!");
     }
 
     // 处理 < 和 <=

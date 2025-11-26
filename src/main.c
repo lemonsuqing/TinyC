@@ -47,6 +47,12 @@ void print_ast(ASTNode* node, int indent) {
             printf("NumericLiteral: %s\n", num_node->value);
             break;
         }
+        case NODE_UNARY_OP: {
+            UnaryOpNode* unary = (UnaryOpNode*)node;
+            printf("UnaryOp: %d\n", unary->op);
+            print_ast(unary->operand, indent + 1);
+            break;
+        }
         default:
             printf("Unknown Node\n");
     }
@@ -121,6 +127,11 @@ void free_ast(ASTNode* node) {
             free_ast(while_stmt->body);
             break;
         }
+        case NODE_UNARY_OP: {
+            UnaryOpNode* unary = (UnaryOpNode*)node;
+            free_ast(unary->operand);
+            break;
+        }
         default:
             break;
     }
@@ -131,7 +142,7 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { int x = 10; int y = 20; int sum = (x < y) + (x == 10); if (sum == 2) { return 42; } else { return 0; } }";
+    char* source_code = "int main() { return - -5 + !0 + !5; }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);
