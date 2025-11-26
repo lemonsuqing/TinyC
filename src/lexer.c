@@ -91,6 +91,14 @@ Token* get_next_token() {
         current_pos++;
         return create_token(TOKEN_SLASH, "/");
     }
+    if (source_code[current_pos] == '[') {
+        current_pos++;
+        return create_token(TOKEN_LBRACKET, "[");
+    }
+    if (source_code[current_pos] == ']') {
+        current_pos++;
+        return create_token(TOKEN_RBRACKET, "]");
+    }
 
     // 处理 = 和 ==
     if (source_code[current_pos] == '=') {

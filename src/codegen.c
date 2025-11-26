@@ -124,7 +124,16 @@ static void codegen_function_declaration(FunctionDeclarationNode* node) {
     for (int i = 0; i < node->body->count; i++) {
         if (node->body->statements[i]->type == NODE_VAR_DECL) {
             VarDeclNode* var = (VarDeclNode*)node->body->statements[i];
-            current_stack_offset += 8;
+            
+            // 计算这个变量占用的大小
+            int size = 8; // 默认为 8 字节
+            if (var->array_size > 0) {
+                size = var->array_size * 8; // 数组大小 * 8
+            }
+
+            current_stack_offset += size; // 累加
+            
+            // 记录符号
             symbol_table[symbol_count].name = var->name;
             symbol_table[symbol_count].stack_offset = current_stack_offset;
             symbol_count++;
@@ -457,6 +466,26 @@ static void gen_lvalue(ASTNode* node) {
         }
         return;
     }
+
+    if (node->type == NODE_ARRAY_ACCESS) {
+        ArrayAccessNode* access = (ArrayAccessNode*)node;
+        Symbol* sym = find_symbol(access->array_name);
+        if (!sym) { fprintf(stderr, "Undefined array %s\n", access->array_name); exit(1); }
+
+        // 1. 计算索引值，结果在 rax
+        codegen_node(access->index);
+
+        // 2. 计算内存地址
+        // 公式: address = rbp - sym->offset + (index * 8)
+        
+        printf("  mov rbx, rax\n");       // rbx = index
+        printf("  imul rbx, 8\n");        // rbx = index * 8
+        printf("  mov rax, rbp\n");       // rax = rbp
+        printf("  sub rax, %d\n", sym->stack_offset); // rax = rbp - offset (即 a[0])
+        printf("  add rax, rbx\n");       // rax = a[0] + index*8
+        
+        return; // rax 现在是地址
+    }
     
     // ... 下面处理指针解引用 (*p = ...) 的逻辑保持不变 ...
     if (node->type == NODE_UNARY_OP) {
@@ -517,6 +546,14 @@ static void codegen_node(ASTNode* node) {
         case NODE_FUNCTION_CALL:
             codegen_function_call((FunctionCallNode*)node);
             break;
+        case NODE_ARRAY_ACCESS: {
+            // 读取数组的值: x = a[i];
+            // 1. 拿到地址
+            gen_lvalue(node);
+            // 2. 取值
+            printf("  mov rax, [rax]\n");
+            break;
+        }
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
             exit(1);

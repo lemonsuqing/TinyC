@@ -28,6 +28,8 @@ typedef enum {
     TOKEN_BANG,         // ! (逻辑非)
     TOKEN_COMMA,        // ,
     TOKEN_AMPERSAND,    // &
+    TOKEN_LBRACKET,     // [
+    TOKEN_RBRACKET,     // ]
 } TokenType;
 
 typedef struct {

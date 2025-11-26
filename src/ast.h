@@ -18,6 +18,7 @@ typedef enum {
     NODE_WHILE_STATEMENT,   // while 语句
     NODE_UNARY_OP,          // 一元操作, e.g. -x, !x
     NODE_FUNCTION_CALL,     // 函数调用 add(1, 2)
+    NODE_ARRAY_ACCESS,      // 数组访问 a[i]
 } NodeType;
 
 // AST 节点的通用结构体
@@ -81,6 +82,7 @@ typedef struct {
     NodeType type; // 值为 NODE_VAR_DECL
     char* name;
     ASTNode* initial_value; // 赋值的初始值表达式
+    int array_size;  // 0 表示标量，>0 表示数组大小
 } VarDeclNode;
 
 // 二元运算符结点
@@ -113,6 +115,13 @@ typedef struct {
     struct ASTNode* operand;    // 操作数
 } UnaryOpNode;
 
+// 数组访问节点
+typedef struct {
+    NodeType type;      // NODE_ARRAY_ACCESS
+    char* array_name;   // 数组名
+    struct ASTNode* index;      // 索引表达式
+} ArrayAccessNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -121,14 +130,15 @@ ProgramNode* create_program_node();
 FunctionDeclarationNode* create_function_declaration_node(char* name, struct ASTNode** args, int arg_count, BlockStatementNode* body);
 ReturnStatementNode* create_return_statement_node(ASTNode* argument);
 void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl);
-VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value);
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size);
 IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
 IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);
 WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
 UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand);
+FunctionCallNode* create_function_call_node(char* name, struct ASTNode** args, int arg_count);
 
 // 新工厂函数
-FunctionCallNode* create_function_call_node(char* name, struct ASTNode** args, int arg_count);
+ArrayAccessNode* create_array_access_node(char* name, struct ASTNode* index);
 
 #endif // AST_H

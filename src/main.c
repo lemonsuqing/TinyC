@@ -143,6 +143,12 @@ void free_ast(ASTNode* node) {
             free_ast((ASTNode*)func->body);
             break;
         }
+        case NODE_ARRAY_ACCESS: {
+            ArrayAccessNode* arr_access = (ArrayAccessNode*)node;
+            free(arr_access->array_name);  // 释放数组名（动态分配的字符串）
+            free_ast(arr_access->index);   // 递归释放索引表达式（可能是数字、标识符等节点）
+            break;
+        }
         default:
             break;
     }
@@ -154,11 +160,16 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = 
-        "int g_val = 10;"       // 全局变量，在数据段
         "int main() { "
-        "  int l_val = 5; "     // 局部变量，在栈上
-        "  g_val = 20; "        // 修改全局变量
-        "  return g_val + l_val; " // 20 + 5 = 25
+        "  int arr[5]; "      // 声明数组
+        "  arr[0] = 1; "
+        "  arr[1] = 1; "
+        "  int i = 2; "
+        "  while (i < 5) { "
+        "    arr[i] = arr[i-1] + arr[i-2]; " // 斐波那契逻辑
+        "    i = i + 1; "
+        "  } "
+        "  return arr[4]; "   // 预期结果: 1, 1, 2, 3, 5 -> 返回 5
         "}";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     

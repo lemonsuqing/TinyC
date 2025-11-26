@@ -106,7 +106,14 @@ ASTNode* parse_factor() {
             }
             eat(TOKEN_RPAREN);
             return (ASTNode*)create_function_call_node(name, args, arg_count);
-        } else {
+        } 
+        else if (current_token->type == TOKEN_LBRACKET) {
+            eat(TOKEN_LBRACKET);
+            ASTNode* index = parse_expression(); // 解析索引 (支持 a[x+1])
+            eat(TOKEN_RBRACKET);
+            return (ASTNode*)create_array_access_node(name, index);
+        }
+        else {
             // --- 这是普通变量 ---
             return (ASTNode*)create_identifier_node(name);
         }
@@ -212,22 +219,38 @@ ASTNode* parse_expression() {
 
 // 解析变量声明语句: "int" <identifier> "=" <expression> ";"
 ASTNode* parse_variable_declaration() {
-    eat(TOKEN_KEYWORD); // 消费 "int"
-
-    // --- 核心修正：不再使用 strdup ---
-    // 1. 先保存指针
+    eat(TOKEN_KEYWORD); // 吃掉 "int"
+    
     char* variable_name = current_token->value;
-    // 2. 再消费 token
     eat(TOKEN_IDENTIFIER);
 
-    eat(TOKEN_ASSIGN);
+    int array_size = 0;
+    ASTNode* expr = NULL;
 
-    ASTNode* expr = parse_expression(); // parse_expression 内部已经消费了它自己的token
+    // 检查是不是数组: int a[10];
+    if (current_token->type == TOKEN_LBRACKET) {
+        eat(TOKEN_LBRACKET);
+        if (current_token->type != TOKEN_INT) {
+            fprintf(stderr, "Error: Array size must be a constant integer.\n");
+            exit(1);
+        }
+        array_size = atoi(current_token->value);
+        eat(TOKEN_INT);
+        eat(TOKEN_RBRACKET);
+        
+        // 数组声明通常直接跟分号
+        eat(TOKEN_SEMICOLON);
+    } else {
+        // 普通变量: int a = 10;
+        if (current_token->type == TOKEN_ASSIGN) {
+            eat(TOKEN_ASSIGN);
+            expr = parse_expression(); 
+        }
+        eat(TOKEN_SEMICOLON);
+    }
 
-    eat(TOKEN_SEMICOLON);
-
-    // 3. 将保存的指针传递给 AST 节点
-    return (ASTNode*)create_var_decl_node(variable_name, expr);
+    // 传入 array_size 参数
+    return (ASTNode*)create_var_decl_node(variable_name, expr, array_size);
 }
 
 // 解析返回语句: "return" <expression> ";"
@@ -360,21 +383,35 @@ ASTNode* parse_top_level() {
         return (ASTNode*)create_function_declaration_node(name, args, arg_count, body);
     } 
     else {
-        // --- 情况 B: 是全局变量声明 ---
-        // 格式: int x = 10; 或 int x;
+        // --- 变量声明逻辑更新 ---
+        int array_size = 0;
         ASTNode* init_expr = NULL;
 
-        if (current_token->type == TOKEN_ASSIGN) {
-            eat(TOKEN_ASSIGN);
-            // 注意：为了简化，全局变量初始化目前只支持数字字面量
-            // 虽然 parse_expression() 支持复杂运算，但汇编 .data 段只能填常量
-            init_expr = parse_expression(); 
+        // 检查是不是数组声明: int a[10];
+        if (current_token->type == TOKEN_LBRACKET) {
+            eat(TOKEN_LBRACKET);
+            // 这里为了简化，我们只支持数字字面量定义大小
+            if (current_token->type != TOKEN_INT) {
+                fprintf(stderr, "Error: Array size must be a constant integer.\n");
+                exit(1);
+            }
+            array_size = atoi(current_token->value); // 获取大小
+            eat(TOKEN_INT);
+            eat(TOKEN_RBRACKET);
+            
+            // 数组声明后通常直接跟分号
+            eat(TOKEN_SEMICOLON);
+        } else {
+            // 普通变量逻辑: int a = 10;
+            if (current_token->type == TOKEN_ASSIGN) {
+                eat(TOKEN_ASSIGN);
+                init_expr = parse_expression(); 
+            }
+            eat(TOKEN_SEMICOLON);
         }
-
-        eat(TOKEN_SEMICOLON);
         
-        // 创建并返回变量声明节点
-        return (ASTNode*)create_var_decl_node(name, init_expr);
+        // 传入 array_size
+        return (ASTNode*)create_var_decl_node(name, init_expr, array_size);
     }
 }
 
@@ -399,7 +436,7 @@ ASTNode** parse_parameter_list(int* count) {
 
         // 3. 创建参数节点 (复用 VarDeclNode，虽然没有初始值，但在 AST 中可以视作声明)
         // 注意：这里 initial_value 传 NULL
-        VarDeclNode* param = create_var_decl_node(param_name, NULL);
+        VarDeclNode* param = create_var_decl_node(param_name, NULL, 0);
 
         // 4. 添加到数组
         (*count)++;
@@ -553,12 +590,13 @@ void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl) {
 }
 
 // 创建一个 “变量声明” 节点
-VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value){
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size){
     VarDeclNode* node = (VarDeclNode*)malloc(sizeof(VarDeclNode));
     if (!node) { exit(1); }
     node->type = NODE_VAR_DECL;
     node->name = name;                      // 接管 name 指针
     node->initial_value = initial_value;    // 接管 body 指针
+    node->array_size = array_size;
     return node;
 }
 
@@ -610,5 +648,14 @@ UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand){
     node->type = NODE_UNARY_OP;
     node->op = op;
     node->operand = operand;
+    return node;
+}
+
+ArrayAccessNode* create_array_access_node(char* name, ASTNode* index) {
+    ArrayAccessNode* node = (ArrayAccessNode*)malloc(sizeof(ArrayAccessNode));
+    if (!node) { exit(1); }
+    node->type = NODE_ARRAY_ACCESS;
+    node->array_name = name;
+    node->index = index;
     return node;
 }
