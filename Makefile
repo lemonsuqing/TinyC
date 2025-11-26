@@ -41,7 +41,7 @@ run: all
 
 TEST_ASSEMBLY = $(TESTDIR)/output.s
 TEST_EXECUTABLE = $(TESTDIR)/my_program
-EXPECTED_EXIT_CODE = 20
+EXPECTED_EXIT_CODE = 25
 
 .PHONY: test
 test: all

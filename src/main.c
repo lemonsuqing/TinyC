@@ -154,11 +154,11 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = 
+        "int g_val = 10;"       // 全局变量，在数据段
         "int main() { "
-        "  int x = 10; "
-        "  int p = &x; " 
-        "  *p = 20; "
-        "  return x; "
+        "  int l_val = 5; "     // 局部变量，在栈上
+        "  g_val = 20; "        // 修改全局变量
+        "  return g_val + l_val; " // 20 + 5 = 25
         "}";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     

@@ -335,28 +335,47 @@ ASTNode* parse_block_statement() {
     return (ASTNode*)block_node;
 }
 
-// 解析函数声明: "int" <identifier> "(" ")" <block_statement>
-FunctionDeclarationNode* parse_function_declaration() {
-    eat(TOKEN_KEYWORD); // 消费 "int"
+// 新函数：用于解析顶层内容（可能是函数，可能是全局变量）
+ASTNode* parse_top_level() {
+    // 1. 既然是顶层，开头肯定是类型关键字 "int"
+    eat(TOKEN_KEYWORD); 
 
-    // --- 核心修正：不再使用 strdup ---
-    // 1. 先保存指针
-    char* function_name = current_token->value;
-    // 2. 再消费 token
+    // 2. 接着是名字
+    char* name = current_token->value;
     eat(TOKEN_IDENTIFIER);
 
-    eat(TOKEN_LPAREN);
+    // 3. 关键判断：向前看一个 Token
+    if (current_token->type == TOKEN_LPAREN) {
+        // --- 情况 A: 是函数声明 ---
+        eat(TOKEN_LPAREN);
 
-    // --- 解析参数 ---
-    int arg_count = 0;
-    ASTNode** args = parse_parameter_list(&arg_count);
+        int arg_count = 0;
+        ASTNode** args = parse_parameter_list(&arg_count);
 
-    eat(TOKEN_RPAREN);
+        eat(TOKEN_RPAREN);
 
-    BlockStatementNode* body = (BlockStatementNode*)parse_block_statement();
-    
-    // 3. 将保存的指针传递给 AST 节点
-    return create_function_declaration_node(function_name, args, arg_count, body);
+        BlockStatementNode* body = (BlockStatementNode*)parse_block_statement();
+        
+        // 创建并返回函数节点
+        return (ASTNode*)create_function_declaration_node(name, args, arg_count, body);
+    } 
+    else {
+        // --- 情况 B: 是全局变量声明 ---
+        // 格式: int x = 10; 或 int x;
+        ASTNode* init_expr = NULL;
+
+        if (current_token->type == TOKEN_ASSIGN) {
+            eat(TOKEN_ASSIGN);
+            // 注意：为了简化，全局变量初始化目前只支持数字字面量
+            // 虽然 parse_expression() 支持复杂运算，但汇编 .data 段只能填常量
+            init_expr = parse_expression(); 
+        }
+
+        eat(TOKEN_SEMICOLON);
+        
+        // 创建并返回变量声明节点
+        return (ASTNode*)create_var_decl_node(name, init_expr);
+    }
 }
 
 // 解析参数列表: (int x, int y)
@@ -447,10 +466,11 @@ ASTNode* parse() {
     current_token = get_next_token();
     ProgramNode* prog = create_program_node();
 
-    // 循环解析所有顶层声明 (目前只有函数)，直到文件末尾
+    // 循环直到文件结束
     while (current_token->type != TOKEN_EOF) {
-        FunctionDeclarationNode* func_decl = parse_function_declaration();
-        add_declaration_to_program(prog, func_decl);
+        // [修改后] 调用新的通用解析函数
+        ASTNode* node = parse_top_level();
+        add_declaration_to_program(prog, node);
     }
     
     return (ASTNode*)prog;
@@ -525,9 +545,9 @@ ReturnStatementNode* create_return_statement_node(ASTNode* argument) {
 }
 
 // 将一个函数声明添加到 Program 节点的列表中
-void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl) {
+void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl) {
     prog->count++;
-    prog->declarations = realloc(prog->declarations, prog->count * sizeof(FunctionDeclarationNode*));
+    prog->declarations = realloc(prog->declarations, prog->count * sizeof(ASTNode*));
     if (!prog->declarations) { exit(1); }
     prog->declarations[prog->count - 1] = decl;
 }

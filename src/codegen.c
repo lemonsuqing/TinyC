@@ -40,6 +40,31 @@ static void codegen_program(ProgramNode* node) {
     // 汇编程序的起点
     printf(".intel_syntax noprefix\n"); // 使用更常见的 Intel 语法（可选，但对初学者更友好）
 
+    printf(".data\n"); 
+    
+    for (int i = 0; i < node->count; i++) {
+        ASTNode* child = node->declarations[i];
+        // 只有变量声明才在 .data 段处理
+        if (child->type == NODE_VAR_DECL) {
+            VarDeclNode* var = (VarDeclNode*)child;
+            
+            // 生成标签: "g_val:"
+            printf("%s:\n", var->name);
+            
+            // 生成初始值
+            if (var->initial_value != NULL && var->initial_value->type == NODE_NUMERIC_LITERAL) {
+                // 如果有初始值: .quad 10
+                NumericLiteralNode* val = (NumericLiteralNode*)var->initial_value;
+                printf("  .quad %s\n", val->value);
+            } else {
+                // 如果没有初始值: .quad 0
+                printf("  .quad 0\n");
+            }
+        }
+    }
+    printf("\n");
+
+    printf(".text\n");
     printf(".globl _start\n"); // 声明 _start 为全局入口点
     printf("_start:\n");
     printf("  call main\n");    // 调用主角 main 函数
@@ -52,9 +77,13 @@ static void codegen_program(ProgramNode* node) {
     // --- 分隔线，下面是我们的函数实现 ---
     printf("\n");
     
-    // 遍历并为程序中的每个声明（函数）生成代码
+    // 遍历并生成函数代码
     for (int i = 0; i < node->count; i++) {
-        codegen_node((ASTNode*)node->declarations[i]);
+        ASTNode* child = node->declarations[i];
+        // 只有函数声明才在这里处理
+        if (child->type == NODE_FUNCTION_DECL) {
+            codegen_node(child);
+        }
     }
 }
 
@@ -148,21 +177,16 @@ static void codegen_variable_declaration(VarDeclNode* node) {
 
 // 为 "Identifier" (变量使用) 节点生成代码
 static void codegen_identifier(IdentifierNode* node) {
-    // TODO:
-    // 1. 从符号表中查找变量的偏移量。
-    // 2. 生成 mov 指令，将栈上变量的值加载到 eax 寄存器中。
-    //    printf("  mov eax, DWORD PTR [rbp-%d]\n", offset);
-
-    // 1. 从符号表中查找变量的偏移量。
+    // 1. 先尝试在局部符号表中查找
     Symbol* symbol = find_symbol(node->name);
-    if (symbol == NULL) {
-        fprintf(stderr, "Codegen Error: Undefined variable '%s'\n", node->name);
-        exit(1);
+    
+    if (symbol != NULL) {
+        // 局部变量 -> 从栈加载
+        printf("  mov rax, [rbp-%d]\n", symbol->stack_offset);
+    } else {
+        // 全局变量 -> 从数据段加载
+        printf("  mov rax, [rip + %s]\n", node->name);
     }
-
-    // 2. 生成 mov 指令，将栈上变量的值加载到 eax 寄存器中。
-    //    e.g., mov eax, DWORD PTR [rbp-8]
-    printf("  mov rax, [rbp-%d]\n", symbol->stack_offset);
 }
 
 // 为 "Block Statement" 节点生成代码
@@ -413,27 +437,32 @@ static void codegen_function_call(FunctionCallNode* node) {
 
 // 生成左值（计算变量或指针的内存地址）
 // 执行完后，rax 中存放的是一个内存地址
+// 生成左值（计算变量或指针的内存地址）
 static void gen_lvalue(ASTNode* node) {
     if (node->type == NODE_IDENTIFIER) {
-        // 情况 1: 变量 (x = ...)
         IdentifierNode* ident = (IdentifierNode*)node;
-        Symbol* sym = find_symbol(ident->name);
-        if (!sym) { fprintf(stderr, "Error: Unknown variable %s\n", ident->name); exit(1); }
         
-        // 核心指令：lea (Load Effective Address)
-        // 计算 rbp - offset 的结果，存入 rax
-        printf("  lea rax, [rbp-%d]\n", sym->stack_offset);
+        // 1. 先在局部符号表找
+        Symbol* sym = find_symbol(ident->name);
+        
+        if (sym) {
+            // [原有逻辑] 找到了 -> 局部变量 (栈地址)
+            // 结果: lea rax, [rbp-8]
+            printf("  lea rax, [rbp-%d]\n", sym->stack_offset);
+        } else {
+            // [新增逻辑] 没找到 -> 默认为全局变量 (RIP 相对寻址)
+            // 结果: lea rax, [rip + g_val]
+            // 注意：这里直接使用 label，不用判断是否存在，交给汇编器报错（如果拼写错误的话）
+            printf("  lea rax, [rip + %s]\n", ident->name);
+        }
         return;
     }
     
+    // ... 下面处理指针解引用 (*p = ...) 的逻辑保持不变 ...
     if (node->type == NODE_UNARY_OP) {
-        // 情况 2: 指针解引用 (*p = ...)
         UnaryOpNode* unary = (UnaryOpNode*)node;
         if (unary->op == TOKEN_STAR) {
-            // *p 的地址，就是 p 的值 (p 里面存的就是地址)
-            // 所以我们要生成 p 的代码 (计算 R-value)
             codegen_node(unary->operand);
-            // 此时 rax 里就是 p 的值 (即目标地址)，任务完成
             return;
         }
     }

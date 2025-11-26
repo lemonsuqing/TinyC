@@ -66,7 +66,7 @@ typedef struct {
 // 程序根节点，它是所有顶层声明的容器
 typedef struct {
     NodeType type; // 值为 NODE_PROGRAM
-    FunctionDeclarationNode** declarations; // 存储程序中所有的函数声明
+    struct ASTNode** declarations; // 存储程序中所有的函数声明
     int count; // 声明的数量
 } ProgramNode;
 
@@ -120,7 +120,7 @@ void add_statement_to_block(BlockStatementNode* block, ASTNode* statement);
 ProgramNode* create_program_node();
 FunctionDeclarationNode* create_function_declaration_node(char* name, struct ASTNode** args, int arg_count, BlockStatementNode* body);
 ReturnStatementNode* create_return_statement_node(ASTNode* argument);
-void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl);
+void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl);
 VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value);
 IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
