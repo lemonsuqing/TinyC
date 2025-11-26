@@ -17,6 +17,7 @@ typedef enum {
     NODE_IF_STATEMENT,      // if 语句
     NODE_WHILE_STATEMENT,   // while 语句
     NODE_UNARY_OP,          // 一元操作, e.g. -x, !x
+    NODE_FUNCTION_CALL,     // 函数调用 add(1, 2)
 } NodeType;
 
 // AST 节点的通用结构体
@@ -47,11 +48,20 @@ typedef struct {
 
 // 函数声明节点, e.g., "int main() { ... }"
 typedef struct {
-    NodeType type; // 值为 NODE_FUNCTION_DECL
-    char* name; // 函数名, e.g., "main"
-    BlockStatementNode* body; // 函数体 (一个代码块)
-    // (为了简化，我们暂时省略返回类型和参数)
+    NodeType type;              // 值为 NODE_FUNCTION_DECL
+    char* name;                 // 函数名, e.g., "main"
+    struct ASTNode** args;      // 参数列表 (数组)
+    int arg_count;              // 参数个数
+    BlockStatementNode* body;   // 函数体 (一个代码块)
 } FunctionDeclarationNode;
+
+// 函数调用节点
+typedef struct {
+    NodeType type;              // 值为 NODE_FUNCTION_CALL
+    char* name;                 // 调用的函数名
+    struct ASTNode** args;      // 传入的实参列表 (表达式)
+    int arg_count;              // 参数个数
+} FunctionCallNode;
 
 // 程序根节点，它是所有顶层声明的容器
 typedef struct {
@@ -108,7 +118,7 @@ NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
 void add_statement_to_block(BlockStatementNode* block, ASTNode* statement);
 ProgramNode* create_program_node();
-FunctionDeclarationNode* create_function_declaration_node(char* name, BlockStatementNode* body);
+FunctionDeclarationNode* create_function_declaration_node(char* name, struct ASTNode** args, int arg_count, BlockStatementNode* body);
 ReturnStatementNode* create_return_statement_node(ASTNode* argument);
 void add_declaration_to_program(ProgramNode* prog, FunctionDeclarationNode* decl);
 VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value);
@@ -116,8 +126,9 @@ IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
 IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);
 WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
+UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand);
 
 // 新工厂函数
-UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand);
+FunctionCallNode* create_function_call_node(char* name, struct ASTNode** args, int arg_count);
 
 #endif // AST_H

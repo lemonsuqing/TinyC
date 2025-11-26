@@ -23,6 +23,7 @@ ASTNode* parse_if_statement();
 ASTNode* parse_assignment_statement();
 ASTNode* parse_while_statement();
 ASTNode* parse_unary();
+ASTNode** parse_parameter_list(int* count);
 
 // -----------
 // 辅助函数
@@ -60,10 +61,6 @@ ASTNode* parse_factor() {
         node = (ASTNode*)create_numeric_literal(value_ptr);
         eat(TOKEN_INT);
     } 
-    else if (type == TOKEN_IDENTIFIER) {
-        node = (ASTNode*)create_identifier_node(value_ptr);
-        eat(TOKEN_IDENTIFIER);
-    } 
     else if (type == TOKEN_LPAREN) {
         // 1. 遇到左括号，先吃掉
         eat(TOKEN_LPAREN);
@@ -75,6 +72,45 @@ ASTNode* parse_factor() {
         // 3. 解析完里面后，必须期望一个右括号
         eat(TOKEN_RPAREN);
     } 
+    else if (type == TOKEN_IDENTIFIER) {
+        // 关键点：我们需要向前看一个 token
+        // 如果是 '('，则是函数调用；否则是变量。
+        // 但我们现在的架构 get_next_token 会覆盖 current_token。
+        // 简单的办法：先创建 ID 节点，然后看下一个是不是 '('。
+        // 更好的办法：在 Lexer 里增加 peek() 功能，或者在这里做一个小 trick。
+        
+        // 这里的 trick：我们先保存名字，eat(ID)，然后看 current_token
+        char* name = current_token->value;
+        eat(TOKEN_IDENTIFIER);
+
+        if (current_token->type == TOKEN_LPAREN) {
+            // --- 这是函数调用 ---
+            eat(TOKEN_LPAREN);
+            
+            ASTNode** args = NULL;
+            int arg_count = 0;
+
+            if (current_token->type != TOKEN_RPAREN) {
+                while (1) {
+                    ASTNode* expr = parse_expression();
+                    arg_count++;
+                    args = realloc(args, sizeof(ASTNode*) * arg_count);
+                    args[arg_count - 1] = expr;
+
+                    if (current_token->type == TOKEN_COMMA) {
+                        eat(TOKEN_COMMA);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            eat(TOKEN_RPAREN);
+            return (ASTNode*)create_function_call_node(name, args, arg_count);
+        } else {
+            // --- 这是普通变量 ---
+            return (ASTNode*)create_identifier_node(name);
+        }
+    }
     else {
         fprintf(stderr, "Syntax Error: Expected number, identifier or '(', but got token type %d\n", type);
         exit(1);
@@ -290,12 +326,55 @@ FunctionDeclarationNode* parse_function_declaration() {
     eat(TOKEN_IDENTIFIER);
 
     eat(TOKEN_LPAREN);
+
+    // --- 解析参数 ---
+    int arg_count = 0;
+    ASTNode** args = parse_parameter_list(&arg_count);
+
     eat(TOKEN_RPAREN);
 
     BlockStatementNode* body = (BlockStatementNode*)parse_block_statement();
     
     // 3. 将保存的指针传递给 AST 节点
-    return create_function_declaration_node(function_name, body);
+    return create_function_declaration_node(function_name, args, arg_count, body);
+}
+
+// 解析参数列表: (int x, int y)
+// 返回 VarDeclNode* 的数组，通过指针参数返回 count
+ASTNode** parse_parameter_list(int* count) {
+    *count = 0;
+    if (current_token->type == TOKEN_RPAREN) {
+        return NULL; // 空参数列表
+    }
+
+    ASTNode** args = NULL;
+    
+    // 类似于 do-while 结构，处理 "类型 变量名" + ","
+    while (1) {
+        // 1. 解析类型 (int)
+        eat(TOKEN_KEYWORD); // 假设只能是 int
+
+        // 2. 解析参数名
+        char* param_name = current_token->value;
+        eat(TOKEN_IDENTIFIER);
+
+        // 3. 创建参数节点 (复用 VarDeclNode，虽然没有初始值，但在 AST 中可以视作声明)
+        // 注意：这里 initial_value 传 NULL
+        VarDeclNode* param = create_var_decl_node(param_name, NULL);
+
+        // 4. 添加到数组
+        (*count)++;
+        args = realloc(args, sizeof(ASTNode*) * (*count));
+        args[(*count) - 1] = (ASTNode*)param;
+
+        // 5. 如果是逗号，继续；如果是右括号，结束
+        if (current_token->type == TOKEN_COMMA) {
+            eat(TOKEN_COMMA);
+        } else {
+            break;
+        }
+    }
+    return args;
 }
 
 // 解析 If 语句: "if" "(" <expression> ")" <statement>
@@ -395,12 +474,24 @@ ProgramNode* create_program_node() {
 }
 
 // 创建一个函数声明节点
-FunctionDeclarationNode* create_function_declaration_node(char* name, BlockStatementNode* body) {
+FunctionDeclarationNode* create_function_declaration_node(char* name, struct ASTNode** args, int arg_count, BlockStatementNode* body) {
     FunctionDeclarationNode* node = (FunctionDeclarationNode*)malloc(sizeof(FunctionDeclarationNode));
     if (!node) { exit(1); }
     node->type = NODE_FUNCTION_DECL;
     node->name = name; // 接管 name 指针
     node->body = body; // 接管 body 指针
+    node->args = args;       // <--- 新增
+    node->arg_count = arg_count; // <--- 新增
+    return node;
+}
+
+FunctionCallNode* create_function_call_node(char* name, ASTNode** args, int arg_count) {
+    FunctionCallNode* node = (FunctionCallNode*)malloc(sizeof(FunctionCallNode));
+    if (!node) exit(1);
+    node->type = NODE_FUNCTION_CALL;
+    node->name = name;
+    node->args = args;
+    node->arg_count = arg_count;
     return node;
 }
 

@@ -71,12 +71,6 @@ void free_ast(ASTNode* node) {
             free(prog->declarations);
             break;
         }
-        case NODE_FUNCTION_DECL: {
-            FunctionDeclarationNode* func = (FunctionDeclarationNode*)node;
-            free(func->name);
-            free_ast((ASTNode*)func->body);
-            break;
-        }
         case NODE_BLOCK_STATEMENT: {
             BlockStatementNode* block = (BlockStatementNode*)node;
             for (int i = 0; i < block->count; i++) {
@@ -132,6 +126,23 @@ void free_ast(ASTNode* node) {
             free_ast(unary->operand);
             break;
         }
+        case NODE_FUNCTION_DECL: {
+            FunctionDeclarationNode* func = (FunctionDeclarationNode*)node;
+            free(func->name);
+            
+            // --- 新增：释放参数列表 ---
+            // 1. 遍历释放每一个参数节点 (VarDeclNode)
+            for (int i = 0; i < func->arg_count; i++) {
+                free_ast(func->args[i]);
+            }
+            // 2. 释放存放指针的数组本身
+            if (func->args != NULL) {
+                free(func->args);
+            }
+            
+            free_ast((ASTNode*)func->body);
+            break;
+        }
         default:
             break;
     }
@@ -142,7 +153,9 @@ void free_ast(ASTNode* node) {
 // 主函数
 // -----------
 int main() {
-    char* source_code = "int main() { return - -5 + !0 + !5; }";
+    char* source_code = 
+        "int add(int a, int b) { return a + b; }"
+        "int main() { return add(10, 20) + add(2, 3); }";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

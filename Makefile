@@ -39,34 +39,31 @@ run: all
 # # 测试规则
 # # ------------------
 
-# TEST_ASSEMBLY = $(TESTDIR)/output.s
-# TEST_EXECUTABLE = $(TESTDIR)/my_program
-# EXPECTED_EXIT_CODE = 5
+TEST_ASSEMBLY = $(TESTDIR)/output.s
+TEST_EXECUTABLE = $(TESTDIR)/my_program
+EXPECTED_EXIT_CODE = 35
 
-# .PHONY: test
-# test: all
-# 	@mkdir -p $(TESTDIR)
-# 	@echo "--- Running Test ---"
-# # 1. 编译 C 源码 -> 汇编文件
-# 	@./$(BINDIR)/$(EXECUTABLE) > $(TEST_ASSEMBLY)
-# # 2. 汇编 -> 可执行文件
-# 	@$(CC) -nostdlib $(TEST_ASSEMBLY) -o $(TEST_EXECUTABLE)
-	
-# # --- 核心修正：为生成的可执行文件添加执行权限 ---
-# 	@chmod +x $(TEST_EXECUTABLE)
-	
-# # 3. 运行
-# 	@./$(TEST_EXECUTABLE)
-# # 4. 检查退出码
-# 	@ACTUAL_EXIT_CODE=$$?; \
-# 	if [ $$ACTUAL_EXIT_CODE -eq $(EXPECTED_EXIT_CODE) ]; then \
-# 		echo "--- Test OK (Exit Code: $$ACTUAL_EXIT_CODE) ---"; \
-# 	else \
-# 		echo "--- Test FAILED (Expected $(EXPECTED_EXIT_CODE), got $$ACTUAL_EXIT_CODE) ---"; \
-# 		exit 1; \
-# 	fi
-# # 5. 清理
-# 	@rm -rf $(TESTDIR)
+.PHONY: test
+test: all
+	@mkdir -p $(TESTDIR)
+	@echo "--- Running Test ---"
+# 1. 编译 C 源码 -> 汇编文件（如果编译器需要输入文件，这里要加输入，比如 ./$(BINDIR)/$(EXECUTABLE) test.c > $(TEST_ASSEMBLY)）
+	@./$(BINDIR)/$(EXECUTABLE) > $(TEST_ASSEMBLY)
+# 2. 汇编 -> 可执行文件
+	@$(CC) -nostdlib $(TEST_ASSEMBLY) -o $(TEST_EXECUTABLE)
+# 3. 加执行权限
+	@chmod +x $(TEST_EXECUTABLE)
+# 4. 关键修改：运行程序 + 捕获退出码 + 判断（合并为一行，同一子shell）
+	@./$(TEST_EXECUTABLE); \
+	ACTUAL_EXIT_CODE=$$?; \
+	if [ $$ACTUAL_EXIT_CODE -eq $(EXPECTED_EXIT_CODE) ]; then \
+		echo "--- Test OK (Exit Code: $$ACTUAL_EXIT_CODE) ---"; \
+	else \
+		echo "--- Test FAILED (Expected $(EXPECTED_EXIT_CODE), got $$ACTUAL_EXIT_CODE) ---"; \
+		exit 1; \
+	fi
+# 5. 清理
+	@rm -rf $(TESTDIR)
 
 # ===================================================================
 # 次测试代码不可运行，因为main返回值是5，非0，OS会识别错误导致测试终止
@@ -85,4 +82,4 @@ run: all
 
 .PHONY: clean
 clean:
-	@rm -rf $(BINDIR) $(TESTDIR)
+	@rm -rf $(BINDIR) $(TESTDIR) my_program output.s

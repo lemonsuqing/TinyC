@@ -27,6 +27,11 @@ Symbol* find_symbol(char* name) {
 // 声明我们将要使用的递归函数
 static void codegen_node(ASTNode* node);
 
+// 辅助：重置符号表
+void reset_symbol_table() {
+    symbol_count = 0;
+}
+
 // --- AST 节点代码生成函数 ---
 
 // 为 "Program" 节点生成代码
@@ -54,6 +59,7 @@ static void codegen_program(ProgramNode* node) {
 
 // 为 "Function Declaration" 节点生成代码
 static void codegen_function_declaration(FunctionDeclarationNode* node) {
+    reset_symbol_table();
     // 声明一个全局可链接的函数标签
     // printf(".globl %s\n", node->name);
     // 函数不再需要是 .globl，因为只有 _start 是外部可见的
@@ -63,47 +69,55 @@ static void codegen_function_declaration(FunctionDeclarationNode* node) {
     printf("  push rbp\n");
     printf("  mov rbp, rsp\n");
 
-    // TODO: 在这里为所有局部变量分配栈空间
-    // 1. 遍历函数体(node->body)，找出有多少个变量声明。
-    // 2. 为每个变量计算偏移量 (第一个是 -4, 第二个是 -8, ...)
-    // 3. 将变量信息存入符号表。
-    // 4. 计算总共需要的栈空间 (比如 2 个 int 变量需要 8 字节)。
-    // 5. 生成 sub rsp, <total_size> 指令。
+    // --- 1. 计算栈空间 ---
+    // 包含参数(node->args) 和 函数体内的变量(node->body中的VarDecl)
+    // 简单起见，我们遍历所有参数和所有语句，统统加到符号表里。
+    
+    // 1.1 先处理参数：把参数注册到符号表
+    // 必须按照寄存器顺序：rdi, rsi, rdx, rcx, r8, r9
+    char* arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+    
+    int current_stack_offset = 0;
 
-    // 1. 遍历函数体(node->body)的所有语句，找出有多少个变量声明。
-    symbol_count = 0;
-    int var_count = 0;
+    for (int i = 0; i < node->arg_count; i++) {
+        VarDeclNode* param = (VarDeclNode*)node->args[i];
+        
+        // 分配栈位置
+        current_stack_offset += 8;
+        symbol_table[symbol_count].name = param->name;
+        symbol_table[symbol_count].stack_offset = current_stack_offset;
+        symbol_count++;
+    }
+
+    // 1.2 再处理函数体内的局部变量
+    // (这部分逻辑和你之前写的差不多，遍历 body 找 VarDecl)
     for (int i = 0; i < node->body->count; i++) {
         if (node->body->statements[i]->type == NODE_VAR_DECL) {
-            var_count++;
-            // 2. 为每个变量计算偏移量并存入符号表。
-            VarDeclNode* var_decl = (VarDeclNode*)node->body->statements[i];
-            symbol_table[symbol_count].name = var_decl->name;
-            // 第一个变量偏移量是 -8 (我们的int是8字节对齐的)，第二个是 -16，以此类推。
-            symbol_table[symbol_count].stack_offset = (var_count) * 8;
+            VarDeclNode* var = (VarDeclNode*)node->body->statements[i];
+            current_stack_offset += 8;
+            symbol_table[symbol_count].name = var->name;
+            symbol_table[symbol_count].stack_offset = current_stack_offset;
             symbol_count++;
         }
     }
 
-    // 3. 计算总共需要的栈空间，并确保16字节对齐 (x86-64 ABI要求)
-    // 计算所有变量需要的总字节数
-    int total_bytes_needed = var_count * 8;
-    // 向上取整到最近的 16 的倍数
-    // 这是一个经典算法: (value + alignment - 1) / alignment * alignment
-    int stack_size_to_allocate = (total_bytes_needed + 15) / 16 * 16;
-    if (stack_size_to_allocate == 0 && var_count > 0) {
-        stack_size_to_allocate = 16;
+    // 1.3 分配栈空间 (16字节对齐)
+    int stack_size = (current_stack_offset + 15) / 16 * 16;
+    if (stack_size > 0) printf("  sub rsp, %d\n", stack_size);
+
+    // --- 2. 将寄存器中的参数值，搬运到栈里 ---
+    // 因为参数是局部变量，代码中会通过 [rbp-N] 访问它们。
+    // 但值现在在 rdi, rsi... 里，所以要搬进去。
+    for (int i = 0; i < node->arg_count; i++) {
+        VarDeclNode* param = (VarDeclNode*)node->args[i];
+        // 查找它在栈里的位置
+        Symbol* sym = find_symbol(param->name); 
+        // 生成: mov [rbp-8], rdi
+        printf("  mov [rbp-%d], %s\n", sym->stack_offset, arg_regs[i]);
     }
 
-    if (stack_size_to_allocate > 0) {
-        printf("  sub rsp, %d\n", stack_size_to_allocate);
-    }
-    
-    // 为函数体（一个代码块）生成代码
+    // --- 3. 生成函数体代码 ---
     codegen_node((ASTNode*)node->body);
-
-    // 注意：函数尾声 (epilogue) 将在 return 语句中生成，
-    // 因为 return 之后就不再有其他代码了。
 }
 
 // 为 "Variable Declaration" 节点生成代码
@@ -357,6 +371,36 @@ static void codegen_unary_op(UnaryOpNode* node) {
     }
 }
 
+static void codegen_function_call(FunctionCallNode* node) {
+    // 寄存器列表
+    char* arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
+    // 1. 计算所有参数的值，并压栈保存
+    // 为什么要压栈？因为计算第2个参数时，可能会覆盖第1个参数用到的寄存器。
+    // 最安全的做法是：算出结果 -> push -> 算出下一个 -> push ... -> 最后 pop 到指定寄存器
+    
+    for (int i = 0; i < node->arg_count; i++) {
+        codegen_node(node->args[i]); // 结果在 rax
+        printf("  push rax\n");
+    }
+
+    // 2. 将参数弹出到对应的寄存器
+    // 注意：栈是后进先出 (LIFO)。
+    // 如果我们要赋给 rdi (第1个), rsi (第2个)...
+    // 我们 push 的顺序是 arg1, arg2...
+    // 栈顶是 argN。
+    // 所以 pop 的顺序必须是反的：先 pop 给最后一个参数，最后 pop 给 rdi。
+    
+    for (int i = node->arg_count - 1; i >= 0; i--) {
+        printf("  pop %s\n", arg_regs[i]);
+    }
+
+    // 3. 调用函数
+    printf("  call %s\n", node->name);
+    
+    // 4. 结果已经在 rax 里了，完美。
+}
+
 /**
  * @brief 递归的 AST 节点访问者函数。
  * 
@@ -399,6 +443,9 @@ static void codegen_node(ASTNode* node) {
             break;
         case NODE_UNARY_OP:
             codegen_unary_op((UnaryOpNode*)node);
+            break;
+        case NODE_FUNCTION_CALL:
+            codegen_function_call((FunctionCallNode*)node);
             break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
