@@ -154,8 +154,12 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = 
-        "int add(int a, int b) { return a + b; }"
-        "int main() { return add(10, 20) + add(2, 3); }";
+        "int main() { "
+        "  int x = 10; "
+        "  int p = &x; " 
+        "  *p = 20; "
+        "  return x; "
+        "}";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

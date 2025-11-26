@@ -123,7 +123,9 @@ ASTNode* parse_unary() {
     // 检查当前是不是一元操作符 (+, -, !)
     if (current_token->type == TOKEN_PLUS || 
         current_token->type == TOKEN_MINUS || 
-        current_token->type == TOKEN_BANG) {
+        current_token->type == TOKEN_BANG || 
+        current_token->type == TOKEN_AMPERSAND ||
+        current_token->type == TOKEN_STAR) {
         
         TokenType op = current_token->type;
         eat(op);
@@ -286,8 +288,26 @@ ASTNode* parse_statement() {
     }
 
     // 注意：赋值语句 (x = 5;) 也是一种语句，我们需要在这里处理
-    if (current_token->type == TOKEN_IDENTIFIER) {
-        return (ASTNode*)parse_assignment_statement(); // 我们需要一个新的解析函数
+    if (current_token->type == TOKEN_IDENTIFIER || current_token->type == TOKEN_STAR) {
+        // 1. 先解析左边的部分 (x 或 *p 或 add())
+        // parse_expression 会自动处理优先级，解析出 *p 这个节点
+        ASTNode* left = parse_expression();
+
+        // 2. 检查后面是不是赋值号 '='
+        if (current_token->type == TOKEN_ASSIGN) {
+            // 是赋值语句: x = ... 或 *p = ...
+            eat(TOKEN_ASSIGN);
+            ASTNode* right = parse_expression();
+            eat(TOKEN_SEMICOLON);
+            
+            // 返回一个二元操作节点 (ASSIGN)，左边是 x 或 *p，右边是值
+            return (ASTNode*)create_binary_op_node(left, TOKEN_ASSIGN, right);
+        } else {
+            // 不是赋值，那可能是一个函数调用语句 add(1); 
+            // 或者是单纯的表达式 x; (虽然没啥用但在C里合法)
+            eat(TOKEN_SEMICOLON);
+            return left;
+        }
     }
 
     // 如果是左大括号，说明是一个代码块

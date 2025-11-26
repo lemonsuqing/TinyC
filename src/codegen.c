@@ -26,6 +26,7 @@ Symbol* find_symbol(char* name) {
 
 // 声明我们将要使用的递归函数
 static void codegen_node(ASTNode* node);
+static void gen_lvalue(ASTNode* node);
 
 // 辅助：重置符号表
 void reset_symbol_table() {
@@ -142,7 +143,7 @@ static void codegen_variable_declaration(VarDeclNode* node) {
 
     // 3. 生成 mov 指令，将 eax 中的值存到栈上对应的位置。
     //    e.g., mov DWORD PTR [rbp-8], eax
-    printf("  mov [rbp-%d], eax\n", symbol->stack_offset);
+    printf("  mov [rbp-%d], rax\n", symbol->stack_offset);
 }
 
 // 为 "Identifier" (变量使用) 节点生成代码
@@ -161,7 +162,7 @@ static void codegen_identifier(IdentifierNode* node) {
 
     // 2. 生成 mov 指令，将栈上变量的值加载到 eax 寄存器中。
     //    e.g., mov eax, DWORD PTR [rbp-8]
-    printf("  mov eax, [rbp-%d]\n", symbol->stack_offset);
+    printf("  mov rax, [rbp-%d]\n", symbol->stack_offset);
 }
 
 // 为 "Block Statement" 节点生成代码
@@ -199,21 +200,20 @@ static void codegen_numeric_literal(NumericLiteralNode* node) {
 // 为 "Binary Operation" 节点生成代码
 static void codegen_binary_op(BinaryOpNode* node) {
     if (node->op == TOKEN_ASSIGN) {
-        // 对于 "x = 5", 左边必须是一个可以被赋值的东西 (变量)
-        // 我们假设它是一个 IdentifierNode
-        IdentifierNode* var = (IdentifierNode*)node->left;
-        Symbol* symbol = find_symbol(var->name);
-        if (!symbol) {
-            fprintf(stderr, "Codegen Error: Assigning to undeclared variable '%s'\n", var->name);
-            exit(1);
-        }
+        // 1. 计算左边的地址 (L-value)，压栈
+        // 比如左边是 x，rax 就得到 &x
+        // 比如左边是 *p，rax 就得到 p 的值
+        gen_lvalue(node->left);
+        printf("  push rax\n"); // 保存地址
 
-        // 1. 生成右边表达式的代码，结果会存入 rax
+        // 2. 计算右边的值 (R-value)
         codegen_node(node->right);
+        // 此时 rax 是右边的值 (例如 20)
 
-        // 2. 将 rax 中的值存入变量在栈上的地址
-        printf("  mov [rbp-%d], rax\n", symbol->stack_offset);
-        return; // 赋值操作到此结束，不需要后续的 push/pop
+        // 3. 赋值
+        printf("  pop rdi\n");      // 弹出的地址放到 rdi
+        printf("  mov [rdi], rax\n"); // 把值写入该地址
+        return;
     }
 
     // 1. 生成右子树的代码 (计算 B)
@@ -353,6 +353,16 @@ static void codegen_unary_op(UnaryOpNode* node) {
 
     // 2. 根据操作符处理 rax
     switch (node->op) {
+        case TOKEN_AMPERSAND: // 取地址 (&x)
+            // &x 的值，就是 x 的 L-value (地址)
+            gen_lvalue(node->operand);
+            // 此时 rax 已经是地址了，直接返回
+            break;
+        case TOKEN_STAR: // 解引用 (*p)
+            // *p 的值，就是先算出 p 的值(地址)，再读取该地址的内容
+            codegen_node(node->operand); // 计算 p，rax = 地址
+            printf("  mov rax, [rax]\n"); // 读取地址里的值
+            break;
         case TOKEN_MINUS: // 负号 (-x)
             printf("  neg rax\n"); // rax = -rax
             break;
@@ -399,6 +409,37 @@ static void codegen_function_call(FunctionCallNode* node) {
     printf("  call %s\n", node->name);
     
     // 4. 结果已经在 rax 里了，完美。
+}
+
+// 生成左值（计算变量或指针的内存地址）
+// 执行完后，rax 中存放的是一个内存地址
+static void gen_lvalue(ASTNode* node) {
+    if (node->type == NODE_IDENTIFIER) {
+        // 情况 1: 变量 (x = ...)
+        IdentifierNode* ident = (IdentifierNode*)node;
+        Symbol* sym = find_symbol(ident->name);
+        if (!sym) { fprintf(stderr, "Error: Unknown variable %s\n", ident->name); exit(1); }
+        
+        // 核心指令：lea (Load Effective Address)
+        // 计算 rbp - offset 的结果，存入 rax
+        printf("  lea rax, [rbp-%d]\n", sym->stack_offset);
+        return;
+    }
+    
+    if (node->type == NODE_UNARY_OP) {
+        // 情况 2: 指针解引用 (*p = ...)
+        UnaryOpNode* unary = (UnaryOpNode*)node;
+        if (unary->op == TOKEN_STAR) {
+            // *p 的地址，就是 p 的值 (p 里面存的就是地址)
+            // 所以我们要生成 p 的代码 (计算 R-value)
+            codegen_node(unary->operand);
+            // 此时 rax 里就是 p 的值 (即目标地址)，任务完成
+            return;
+        }
+    }
+
+    fprintf(stderr, "Error: Left side of assignment must be a variable or pointer dereference.\n");
+    exit(1);
 }
 
 /**

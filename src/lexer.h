@@ -27,6 +27,7 @@ typedef enum {
     TOKEN_GE,           // >=
     TOKEN_BANG,         // ! (逻辑非)
     TOKEN_COMMA,        // ,
+    TOKEN_AMPERSAND,    // &
 } TokenType;
 
 typedef struct {
