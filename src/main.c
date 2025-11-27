@@ -11,6 +11,7 @@
 void print_ast(ASTNode* node, int indent) {
     if (node == NULL) return;
 
+    // 打印缩进
     for (int i = 0; i < indent; i++) printf("  ");
 
     switch (node->type) {
@@ -24,14 +25,16 @@ void print_ast(ASTNode* node, int indent) {
         }
         case NODE_FUNCTION_DECL: {
             FunctionDeclarationNode* func = (FunctionDeclarationNode*)node;
-            printf("FunctionDeclaration: name='%s'\n", func->name);
+            printf("FunctionDeclaration: int %s()\n", func->name);
+            // 打印参数 (如果有)
+            if (func->arg_count > 0) {
+                for (int i = 0; i < indent + 1; i++) printf("  ");
+                printf("Args:\n");
+                for (int i = 0; i < func->arg_count; i++) {
+                    print_ast(func->args[i], indent + 2);
+                }
+            }
             print_ast((ASTNode*)func->body, indent + 1);
-            break;
-        }
-        case NODE_RETURN_STATEMENT: {
-            printf("ReturnStatement:\n");
-            ReturnStatementNode* ret = (ReturnStatementNode*)node;
-            print_ast(ret->argument, indent + 1);
             break;
         }
         case NODE_BLOCK_STATEMENT: {
@@ -42,19 +45,88 @@ void print_ast(ASTNode* node, int indent) {
             }
             break;
         }
+        case NODE_VAR_DECL: {
+            VarDeclNode* var = (VarDeclNode*)node;
+            if (var->array_size > 0) {
+                printf("VarDecl: int %s[%d] (Array)\n", var->name, var->array_size);
+            } else {
+                printf("VarDecl: int %s\n", var->name);
+            }
+            if (var->initial_value) {
+                print_ast(var->initial_value, indent + 1);
+            }
+            break;
+        }
+        case NODE_RETURN_STATEMENT: {
+            printf("ReturnStatement:\n");
+            ReturnStatementNode* ret = (ReturnStatementNode*)node;
+            print_ast(ret->argument, indent + 1);
+            break;
+        }
+        case NODE_IF_STATEMENT: {
+            printf("IfStatement:\n");
+            IfStatementNode* if_stmt = (IfStatementNode*)node;
+            print_ast(if_stmt->condition, indent + 1);
+            print_ast(if_stmt->body, indent + 1);
+            if (if_stmt->else_branch) {
+                for (int i = 0; i < indent; i++) printf("  ");
+                printf("Else:\n");
+                print_ast(if_stmt->else_branch, indent + 1);
+            }
+            break;
+        }
+        case NODE_WHILE_STATEMENT: {
+            printf("WhileStatement:\n");
+            WhileStatementNode* while_stmt = (WhileStatementNode*)node;
+            print_ast(while_stmt->condition, indent + 1);
+            print_ast(while_stmt->body, indent + 1);
+            break;
+        }
+        case NODE_BINARY_OP: {
+            BinaryOpNode* bin = (BinaryOpNode*)node;
+            // 简单打印操作符的枚举值，你也可以写个 switch 转成字符显示
+            printf("BinaryOp (Token type: %d):\n", bin->op);
+            print_ast(bin->left, indent + 1);
+            print_ast(bin->right, indent + 1);
+            break;
+        }
+        case NODE_UNARY_OP: {
+            UnaryOpNode* unary = (UnaryOpNode*)node;
+            printf("UnaryOp (Token type: %d):\n", unary->op);
+            print_ast(unary->operand, indent + 1);
+            break;
+        }
+        case NODE_FUNCTION_CALL: {
+            FunctionCallNode* call = (FunctionCallNode*)node;
+            printf("FunctionCall: %s(...)\n", call->name);
+            for (int i = 0; i < call->arg_count; i++) {
+                print_ast(call->args[i], indent + 1);
+            }
+            break;
+        }
+        case NODE_ARRAY_ACCESS: {
+            ArrayAccessNode* arr = (ArrayAccessNode*)node;
+            printf("ArrayAccess: %s[...]\n", arr->array_name);
+            print_ast(arr->index, indent + 1);
+            break;
+        }
+        case NODE_IDENTIFIER: {
+            IdentifierNode* ident = (IdentifierNode*)node;
+            printf("Identifier: %s\n", ident->name);
+            break;
+        }
         case NODE_NUMERIC_LITERAL: {
             NumericLiteralNode* num_node = (NumericLiteralNode*)node;
             printf("NumericLiteral: %s\n", num_node->value);
             break;
         }
-        case NODE_UNARY_OP: {
-            UnaryOpNode* unary = (UnaryOpNode*)node;
-            printf("UnaryOp: %d\n", unary->op);
-            print_ast(unary->operand, indent + 1);
+        case NODE_STRING_LITERAL: {
+            StringLiteralNode* str_node = (StringLiteralNode*)node;
+            printf("StringLiteral: \"%s\"\n", str_node->value);
             break;
         }
         default:
-            printf("Unknown Node\n");
+            printf("Unknown Node (Type: %d)\n", node->type);
     }
 }
 
