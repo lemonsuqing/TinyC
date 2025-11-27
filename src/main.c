@@ -160,16 +160,14 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = 
+        // 声明 printf，因为它是外部函数，且参数不固定
+        // 但我们在 parser 里其实不检查函数声明，只要是个名字就能 call
+        // 所以直接用就行！
+        
         "int main() { "
-        "  int arr[5]; "      // 声明数组
-        "  arr[0] = 1; "
-        "  arr[1] = 1; "
-        "  int i = 2; "
-        "  while (i < 5) { "
-        "    arr[i] = arr[i-1] + arr[i-2]; " // 斐波那契逻辑
-        "    i = i + 1; "
-        "  } "
-        "  return arr[4]; "   // 预期结果: 1, 1, 2, 3, 5 -> 返回 5
+        "  int a = 7; "
+        "  printf(\"Hello TinyC! Number: %d\\n\", a); "
+        "  return 0; "
         "}";
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     

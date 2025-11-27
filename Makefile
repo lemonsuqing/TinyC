@@ -41,7 +41,7 @@ run: all
 
 TEST_ASSEMBLY = $(TESTDIR)/output.s
 TEST_EXECUTABLE = $(TESTDIR)/my_program
-EXPECTED_EXIT_CODE = 5
+EXPECTED_EXIT_CODE = 0
 
 .PHONY: test
 test: all
@@ -50,7 +50,7 @@ test: all
 # 1. 编译 C 源码 -> 汇编文件（如果编译器需要输入文件，这里要加输入，比如 ./$(BINDIR)/$(EXECUTABLE) test.c > $(TEST_ASSEMBLY)）
 	@./$(BINDIR)/$(EXECUTABLE) > $(TEST_ASSEMBLY)
 # 2. 汇编 -> 可执行文件
-	@$(CC) -nostdlib $(TEST_ASSEMBLY) -o $(TEST_EXECUTABLE)
+	@$(CC) $(TEST_ASSEMBLY) -o $(TEST_EXECUTABLE)
 # 3. 加执行权限
 	@chmod +x $(TEST_EXECUTABLE)
 # 4. 关键修改：运行程序 + 捕获退出码 + 判断（合并为一行，同一子shell）

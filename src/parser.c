@@ -118,6 +118,11 @@ ASTNode* parse_factor() {
             return (ASTNode*)create_identifier_node(name);
         }
     }
+    else if (type == TOKEN_STRING) {
+        char* val = current_token->value;
+        eat(TOKEN_STRING);
+        return (ASTNode*)create_string_literal_node(val);
+    }
     else {
         fprintf(stderr, "Syntax Error: Expected number, identifier or '(', but got token type %d\n", type);
         exit(1);
@@ -657,5 +662,14 @@ ArrayAccessNode* create_array_access_node(char* name, ASTNode* index) {
     node->type = NODE_ARRAY_ACCESS;
     node->array_name = name;
     node->index = index;
+    return node;
+}
+
+StringLiteralNode* create_string_literal_node(char* value) {
+    StringLiteralNode* node = (StringLiteralNode*)malloc(sizeof(StringLiteralNode));
+    if (!node) exit(1);
+    node->type = NODE_STRING_LITERAL;
+    node->value = value;
+    node->original_id = -1; // 初始化为 -1，生成代码时再分配
     return node;
 }

@@ -181,6 +181,32 @@ Token* get_next_token() {
             return create_token(TOKEN_IDENTIFIER, str);
         }
     }
+
+    // 处理字符串
+    if (source_code[current_pos] == '"') {
+        current_pos++;
+        int start = current_pos;
+
+        while(source_code[current_pos] != '"' && source_code[current_pos] != '\0'){
+            current_pos++;
+        }
+
+        if (source_code[current_pos] == '\0') {
+            fprintf(stderr, "Error: Unclosed string literal.\n");
+            exit(1);
+        }
+
+        // 截取字符串
+        int len = current_pos - start;
+        char* str_value = (char*)malloc(len + 1);
+        strncpy(str_value, source_code + start, len);
+        str_value[len] = '\0';
+        
+        current_pos++; // 跳过结尾的 "
+        
+        return create_token(TOKEN_STRING, str_value);
+    }
+
     current_pos++;
     return create_token(TOKEN_UNKNOWN, "");
 }

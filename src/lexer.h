@@ -30,6 +30,7 @@ typedef enum {
     TOKEN_AMPERSAND,    // &
     TOKEN_LBRACKET,     // [
     TOKEN_RBRACKET,     // ]
+    TOKEN_STRING,       // string, such as :"Hello"
 } TokenType;
 
 typedef struct {

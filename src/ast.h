@@ -19,6 +19,7 @@ typedef enum {
     NODE_UNARY_OP,          // 一元操作, e.g. -x, !x
     NODE_FUNCTION_CALL,     // 函数调用 add(1, 2)
     NODE_ARRAY_ACCESS,      // 数组访问 a[i]
+    NODE_STRING_LITERAL,    // string, such as: "Hello"
 } NodeType;
 
 // AST 节点的通用结构体
@@ -104,8 +105,8 @@ typedef struct {
 // while 语句节点
 typedef struct {
     NodeType type;              // 值为 NODE_WHILE_STATEMENT
-    struct ASTNode* condition; // 循环条件
-    struct ASTNode* body;      // 循环体
+    struct ASTNode* condition;  // 循环条件
+    struct ASTNode* body;       // 循环体
 } WhileStatementNode;
 
 // 一元操作符 结点
@@ -122,6 +123,13 @@ typedef struct {
     struct ASTNode* index;      // 索引表达式
 } ArrayAccessNode;
 
+// 字符串节点
+typedef struct {
+    NodeType type;
+    char* value;     // 存储 "Hello"
+    int original_id; // [关键] 用于代码生成时标记它是第几个字符串 (.LC0, .LC1...)
+} StringLiteralNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -137,8 +145,9 @@ IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, AST
 WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* body);
 UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand);
 FunctionCallNode* create_function_call_node(char* name, struct ASTNode** args, int arg_count);
+ArrayAccessNode* create_array_access_node(char* name, struct ASTNode* index);
 
 // 新工厂函数
-ArrayAccessNode* create_array_access_node(char* name, struct ASTNode* index);
+StringLiteralNode* create_string_literal_node(char* value);
 
 #endif // AST_H

@@ -14,6 +14,29 @@ typedef struct {
 Symbol symbol_table[100]; // 假设最多100个局部变量
 int symbol_count = 0;
 
+// --- 字符串池 ---
+struct {
+    char* content;
+    int id;
+} string_pool[100]; // 假设最多100个字符串
+int string_count = 0;
+
+// 添加字符串到池中，返回其 ID
+int add_string_to_pool(char* content) {
+    // 简单的去重逻辑（可选）：如果内容一样，返回同一个ID
+    for(int i=0; i<string_count; i++) {
+        if (strcmp(string_pool[i].content, content) == 0) {
+            return string_pool[i].id;
+        }
+    }
+    
+    int id = string_count;
+    string_pool[id].content = content;
+    string_pool[id].id = id;
+    string_count++;
+    return id;
+}
+
 // 在符号表中查找一个变量
 Symbol* find_symbol(char* name) {
     for (int i = 0; i < symbol_count; i++) {
@@ -65,14 +88,15 @@ static void codegen_program(ProgramNode* node) {
     printf("\n");
 
     printf(".text\n");
-    printf(".globl _start\n"); // 声明 _start 为全局入口点
-    printf("_start:\n");
-    printf("  call main\n");    // 调用主角 main 函数
+    // printf(".globl _start\n"); // 声明 _start 为全局入口点
+    // printf("_start:\n");
+    // printf("  call main\n");    // 调用主角 main 函数
 
-    // --- main 返回后，处理退出的逻辑 ---
-    printf("  mov rdi, rax\n"); // 将 main 的返回值 (在rax) 放入 rdi，作为 exit 的参数
-    printf("  mov rax, 60\n");  // 将 exit 的系统调用号 (60) 放入 rax
-    printf("  syscall\n");     // 调用内核，退出程序
+    // // --- main 返回后，处理退出的逻辑 ---
+    // printf("  mov rdi, rax\n"); // 将 main 的返回值 (在rax) 放入 rdi，作为 exit 的参数
+    // printf("  mov rax, 60\n");  // 将 exit 的系统调用号 (60) 放入 rax
+    // printf("  syscall\n");     // 调用内核，退出程序
+    printf(".globl main\n"); // 声明 main
 
     // --- 分隔线，下面是我们的函数实现 ---
     printf("\n");
@@ -84,6 +108,14 @@ static void codegen_program(ProgramNode* node) {
         if (child->type == NODE_FUNCTION_DECL) {
             codegen_node(child);
         }
+    }
+
+    // --- 3. 只读数据段 (.rodata) ---
+    // 这里非常关键：这时所有的函数代码都生成完了，字符串池里应该满了
+    printf("\n.section .rodata\n");
+    for (int i = 0; i < string_count; i++) {
+        printf(".LC%d:\n", string_pool[i].id);
+        printf("  .string \"%s\"\n", string_pool[i].content);
     }
 }
 
@@ -438,6 +470,10 @@ static void codegen_function_call(FunctionCallNode* node) {
         printf("  pop %s\n", arg_regs[i]);
     }
 
+    // [新增] ABI 要求：对于变长参数函数(printf)，al 记录向量寄存器数量
+    // 安全起见，我们在每次函数调用前都清零 rax (或者只清零 al)
+    printf("  mov rax, 0\n"); 
+
     // 3. 调用函数
     printf("  call %s\n", node->name);
     
@@ -500,6 +536,15 @@ static void gen_lvalue(ASTNode* node) {
     exit(1);
 }
 
+static void codegen_string_literal(StringLiteralNode* node) {
+    // 1. 把它注册到全局池子，拿到一个唯一的 ID (例如 0)
+    int id = add_string_to_pool(node->value);
+    
+    // 2. 生成获取地址的指令
+    // 我们约定 .LC0, .LC1 作为字符串的标签
+    printf("  lea rax, [rip + .LC%d]\n", id);
+}
+
 /**
  * @brief 递归的 AST 节点访问者函数。
  * 
@@ -554,6 +599,9 @@ static void codegen_node(ASTNode* node) {
             printf("  mov rax, [rax]\n");
             break;
         }
+        case NODE_STRING_LITERAL:
+            codegen_string_literal((StringLiteralNode*)node);
+            break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
             exit(1);
