@@ -271,18 +271,24 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = 
-        "// 这是头部注释：测试 For 循环和注释功能\n" 
+        "// 测试高级循环控制：break 和 continue\n"
         "int main() { "
-        "  int sum = 0; // 定义累加变量\n" 
+        "  int sum = 0; // 累加结果\n"
         "  "
-        "  // 开始循环：从 0 加到 4\n"
-        "  for (int i = 0; i < 5; i = i + 1) { "
-        "    sum = sum + i; // 累加过程\n" 
+        "  // 循环 0 到 9\n"
+        "  for (int i = 0; i < 10; i = i + 1) { "
+        "    if (i == 5) { "
+        "      continue; // i为5时跳过本次循环，不累加\n"
+        "    } "
+        "    if (i == 8) { "
+        "      break; // i为8时直接终止整个循环\n"
+        "    } "
+        "    sum = sum + i; // 累加: 0+1+2+3+4+6+7 = 23\n"
         "  } "
         "  "
-        "  printf(\"Sum is: %d\\n\", sum); // 输出结果，预期是 10\n"
-        "  return 0; // 返回结果\n"
-        "}"; // 这里的 } 必须在上一行的 \n 之后
+        "  printf(\"Sum is: %d\\n\", sum); // 预期输出 23\n"
+        "  return 0; // 返回退出码 23\n"
+        "}"; // 安全闭合
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

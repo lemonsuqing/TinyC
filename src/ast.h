@@ -21,6 +21,8 @@ typedef enum {
     NODE_ARRAY_ACCESS,      // 数组访问 a[i]
     NODE_STRING_LITERAL,    // string, such as: "Hello"
     NODE_FOR_STATEMENT,     // for 语句
+    NODE_BREAK,             // break
+    NODE_CONTINUE,          // continue
 } NodeType;
 
 // AST 节点的通用结构体
@@ -140,6 +142,14 @@ typedef struct {
     struct ASTNode* body;      // { ... }
 } ForStatementNode;
 
+typedef struct {
+    NodeType type;
+} BreakNode;
+
+typedef struct {
+    NodeType type;
+} ContinueNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -157,8 +167,10 @@ UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand);
 FunctionCallNode* create_function_call_node(char* name, struct ASTNode** args, int arg_count);
 ArrayAccessNode* create_array_access_node(char* name, struct ASTNode* index);
 StringLiteralNode* create_string_literal_node(char* value);
+ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNode* inc, ASTNode* body);
 
 // 新工厂函数
-ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNode* inc, ASTNode* body);
+ASTNode* create_break_node();
+ASTNode* create_continue_node();
 
 #endif // AST_H

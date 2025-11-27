@@ -3,6 +3,11 @@
 #include <string.h>
 
 static void scan_locals(ASTNode* node, int* current_stack_offset);
+
+// 由于 C 语言处理字符串麻烦，我们还是存 ID 和 类型 吧。
+static int current_loop_id = -1;
+static int current_loop_type = 0; // 0: None, 1: While, 2: For
+
 // 一个全局计数器，用于生成唯一的标签
 static int label_counter = 0;
 
@@ -427,27 +432,29 @@ static void codegen_if_statement(IfStatementNode* node) {
 static void codegen_while_statement(WhileStatementNode* node) {
     int label_id = label_counter++;
     
-    // 1. 放置“循环开始”标签
-    printf("_L_start_%d:\n", label_id);
-
-    // 2. 生成条件检查代码
+    // 保存旧状态
+    int old_id = current_loop_id;
+    int old_type = current_loop_type;
+    
+    // 设置新状态
+    current_loop_id = label_id;
+    current_loop_type = 1; // While
+    
+    printf(".L_start_%d:\n", label_id);
+    // ... 条件 ...
     codegen_node(node->condition);
-
-    // 3. 如果条件不满足，跳出循环 (跳到 end)
-    // 注意：目前的条件只支持 > (TOKEN_GT)。
-    // 如果是 x > 0，汇编比较的是 cmp rax, rdi (即 x, 0)
-    // 如果 x <= 0 (即 jle)，则跳出
     printf("  cmp rax, 0\n");
-    printf("  je  _L_end_%d\n", label_id); // 如果是 0，跳出循环
+    printf("  je .L_end_%d\n", label_id);
 
-    // 4. 生成循环体代码
+    // ... 循环体 (内部可能遇到 break/continue) ...
     codegen_node(node->body);
 
-    // 5. 循环体结束后，无条件跳回开始标签，再次检查条件
-    printf("  jmp _L_start_%d\n", label_id);
-
-    // 6. 放置“循环结束”标签
-    printf("_L_end_%d:\n", label_id);
+    printf("  jmp .L_start_%d\n", label_id);
+    printf(".L_end_%d:\n", label_id);
+    
+    // 恢复旧状态
+    current_loop_id = old_id;
+    current_loop_type = old_type;
 }
 
 // 处理一元节点的函数，并在分发器中注册
@@ -637,33 +644,59 @@ static void scan_locals(ASTNode* node, int* current_stack_offset) {
 
 static void codegen_for_statement(ForStatementNode* node) {
     int label_id = label_counter++;
-
-    // 1. 生成初始化代码 (只执行一次)
+    
+    int old_id = current_loop_id;
+    int old_type = current_loop_type;
+    
+    current_loop_id = label_id;
+    current_loop_type = 2; // For
+    
     if (node->init) codegen_node(node->init);
 
-    // 2. 循环开始标签
     printf(".L_start_%d:\n", label_id);
-
-    // 3. 条件检查
     if (node->condition) {
         codegen_node(node->condition);
         printf("  cmp rax, 0\n");
-        printf("  je .L_end_%d\n", label_id); // 为假跳出
+        printf("  je .L_end_%d\n", label_id);
     }
 
-    // 4. 循环体
     codegen_node(node->body);
 
-    // 5. 递增代码 (执行完 body 后执行)
+    // 关键：For 循环需要一个专门的 increment 标签供 continue 跳转
+    printf(".L_inc_%d:\n", label_id); // <--- 新增这个标签
     if (node->increment) {
         codegen_node(node->increment);
     }
-
-    // 6. 跳回开始
     printf("  jmp .L_start_%d\n", label_id);
 
-    // 7. 结束标签
     printf(".L_end_%d:\n", label_id);
+    
+    current_loop_id = old_id;
+    current_loop_type = old_type;
+}
+
+static void codegen_break(ASTNode* node) {
+    if (current_loop_id == -1) {
+        fprintf(stderr, "Error: 'break' outside of loop.\n");
+        exit(1);
+    }
+    // 无论是 while 还是 for，break 都是去 .L_end_ID
+    printf("  jmp .L_end_%d\n", current_loop_id);
+}
+
+static void codegen_continue(ASTNode* node) {
+    if (current_loop_id == -1) {
+        fprintf(stderr, "Error: 'continue' outside of loop.\n");
+        exit(1);
+    }
+    
+    if (current_loop_type == 1) {
+        // While: 跳回 start
+        printf("  jmp .L_start_%d\n", current_loop_id);
+    } else if (current_loop_type == 2) {
+        // For: 跳回 increment
+        printf("  jmp .L_inc_%d\n", current_loop_id);
+    }
 }
 
 /**
@@ -725,6 +758,12 @@ static void codegen_node(ASTNode* node) {
             break;
         case NODE_FOR_STATEMENT:
             codegen_for_statement((ForStatementNode*)node);
+            break;
+        case NODE_BREAK:
+            codegen_break(node);
+            break;
+        case NODE_CONTINUE:
+            codegen_continue(node);
             break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);

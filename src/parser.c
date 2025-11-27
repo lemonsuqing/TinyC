@@ -354,6 +354,18 @@ ASTNode* parse_statement() {
         return parse_for_statement();
     }
 
+    if (strcmp(current_token->value, "break") == 0) {
+        eat(TOKEN_KEYWORD);
+        eat(TOKEN_SEMICOLON);
+        return create_break_node();
+    }
+    
+    if (strcmp(current_token->value, "continue") == 0) {
+        eat(TOKEN_KEYWORD);
+        eat(TOKEN_SEMICOLON);
+        return create_continue_node();
+    }
+
     // 注意：赋值语句 (x = 5;) 也是一种语句，我们需要在这里处理
     if (current_token->type == TOKEN_IDENTIFIER || current_token->type == TOKEN_STAR) {
         // 1. 先解析左边的部分 (x 或 *p 或 add())
@@ -781,5 +793,16 @@ ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNod
     node->condition = cond;
     node->increment = inc;
     node->body = body;
+    return node;
+}
+
+ASTNode* create_break_node() {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_BREAK;
+    return node;
+}
+ASTNode* create_continue_node() {
+    ASTNode* node = malloc(sizeof(ASTNode));
+    node->type = NODE_CONTINUE;
     return node;
 }

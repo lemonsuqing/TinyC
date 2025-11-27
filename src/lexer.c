@@ -221,7 +221,9 @@ Token* get_next_token() {
             strcmp(str, "if") == 0 || 
             strcmp(str, "else") == 0 ||
             strcmp(str, "while") == 0 || 
-            strcmp(str, "for") == 0) 
+            strcmp(str, "for") == 0 ||
+            strcmp(str, "break") == 0 ||
+            strcmp(str, "continue") == 0) 
         {
             return create_token(TOKEN_KEYWORD, str);
         } else {
