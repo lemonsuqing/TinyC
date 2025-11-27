@@ -22,6 +22,7 @@ ASTNode* parse_factor();
 ASTNode* parse_if_statement();
 ASTNode* parse_assignment_statement();
 ASTNode* parse_while_statement();
+ASTNode* parse_for_statement();
 ASTNode* parse_unary();
 ASTNode** parse_parameter_list(int* count);
 ASTNode* parse_logical_or();
@@ -348,6 +349,11 @@ ASTNode* parse_statement() {
         return parse_while_statement();
     }
 
+    // 如果是 "for" 关键字
+    if (strcmp(current_token->value, "for") == 0) {
+        return parse_for_statement();
+    }
+
     // 注意：赋值语句 (x = 5;) 也是一种语句，我们需要在这里处理
     if (current_token->type == TOKEN_IDENTIFIER || current_token->type == TOKEN_STAR) {
         // 1. 先解析左边的部分 (x 或 *p 或 add())
@@ -533,6 +539,67 @@ ASTNode* parse_while_statement() {
     return (ASTNode*)create_while_statement_node(condition, body);
 }
 
+// 新增 parse_for_statement
+ASTNode* parse_for_statement() {
+    eat(TOKEN_KEYWORD); // for
+    eat(TOKEN_LPAREN);  // (
+    
+    // 1. 初始化部分
+    ASTNode* init = NULL;
+    if (current_token->type != TOKEN_SEMICOLON) {
+        if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "int") == 0) {
+            init = parse_variable_declaration(); 
+        } else {
+            // 这里为了支持 i=0 这种赋值表达式，我们手动处理一下
+            ASTNode* left = parse_expression();
+            if (current_token->type == TOKEN_ASSIGN) {
+                eat(TOKEN_ASSIGN);
+                ASTNode* right = parse_expression();
+                init = (ASTNode*)create_binary_op_node(left, TOKEN_ASSIGN, right);
+            } else {
+                init = left;
+            }
+            eat(TOKEN_SEMICOLON); 
+        }
+    } else {
+        eat(TOKEN_SEMICOLON);
+    }
+
+    // 2. 条件部分
+    ASTNode* cond = NULL;
+    if (current_token->type != TOKEN_SEMICOLON) {
+        cond = parse_expression();
+    }
+    eat(TOKEN_SEMICOLON);
+
+    // 3. 递增部分 (i = i + 1)
+    ASTNode* inc = NULL;
+    if (current_token->type != TOKEN_RPAREN) {
+        // [关键修改]：手动检查是否是赋值操作
+        // 因为 parse_expression 目前不包含赋值逻辑
+        
+        ASTNode* left = parse_expression(); // 先解析 'i'
+        
+        if (current_token->type == TOKEN_ASSIGN) {
+            // 如果后面跟的是 '='，说明是赋值
+            TokenType op = current_token->type; // TOKEN_ASSIGN
+            eat(TOKEN_ASSIGN);
+            ASTNode* right = parse_expression(); // 解析 'i + 1'
+            // 组合成赋值节点
+            inc = (ASTNode*)create_binary_op_node(left, op, right);
+        } else {
+            // 否则就是普通表达式
+            inc = left;
+        }
+    }
+    eat(TOKEN_RPAREN); // )
+
+    // 4. 循环体
+    ASTNode* body = parse_statement();
+
+    return (ASTNode*)create_for_statement_node(init, cond, inc, body);
+}
+
 // -----------
 // 语法分析器主入口
 // -----------
@@ -704,5 +771,15 @@ StringLiteralNode* create_string_literal_node(char* value) {
     node->type = NODE_STRING_LITERAL;
     node->value = value;
     node->original_id = -1; // 初始化为 -1，生成代码时再分配
+    return node;
+}
+
+ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNode* inc, ASTNode* body) {
+    ForStatementNode* node = malloc(sizeof(ForStatementNode));
+    node->type = NODE_FOR_STATEMENT;
+    node->init = init;
+    node->condition = cond;
+    node->increment = inc;
+    node->body = body;
     return node;
 }

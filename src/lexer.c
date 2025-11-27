@@ -220,7 +220,8 @@ Token* get_next_token() {
             strcmp(str, "return") == 0 || 
             strcmp(str, "if") == 0 || 
             strcmp(str, "else") == 0 ||
-            strcmp(str, "while") == 0) 
+            strcmp(str, "while") == 0 || 
+            strcmp(str, "for") == 0) 
         {
             return create_token(TOKEN_KEYWORD, str);
         } else {

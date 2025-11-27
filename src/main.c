@@ -82,6 +82,37 @@ void print_ast(ASTNode* node, int indent) {
             print_ast(while_stmt->body, indent + 1);
             break;
         }
+        case NODE_FOR_STATEMENT: {
+            printf("ForStatement:\n");
+            ForStatementNode* for_node = (ForStatementNode*)node;
+
+            // 1. 打印初始化部分
+            if (for_node->init != NULL) {
+                for (int i = 0; i < indent + 1; i++) printf("  ");
+                printf("Init:\n");
+                print_ast(for_node->init, indent + 2);
+            }
+
+            // 2. 打印条件部分
+            if (for_node->condition != NULL) {
+                for (int i = 0; i < indent + 1; i++) printf("  ");
+                printf("Condition:\n");
+                print_ast(for_node->condition, indent + 2);
+            }
+
+            // 3. 打印增量部分
+            if (for_node->increment != NULL) {
+                for (int i = 0; i < indent + 1; i++) printf("  ");
+                printf("Increment:\n");
+                print_ast(for_node->increment, indent + 2);
+            }
+
+            // 4. 打印循环体
+            for (int i = 0; i < indent + 1; i++) printf("  ");
+            printf("Body:\n");
+            print_ast(for_node->body, indent + 2);
+            break;
+        }
         case NODE_BINARY_OP: {
             BinaryOpNode* bin = (BinaryOpNode*)node;
             // 简单打印操作符的枚举值，你也可以写个 switch 转成字符显示
@@ -193,6 +224,14 @@ void free_ast(ASTNode* node) {
             free_ast(while_stmt->body);
             break;
         }
+        case NODE_FOR_STATEMENT: {
+            ForStatementNode* for_node = (ForStatementNode*)node;
+            free_ast(for_node->init);
+            free_ast(for_node->condition);
+            free_ast(for_node->increment);
+            free_ast(for_node->body);
+            break;
+        }
         case NODE_UNARY_OP: {
             UnaryOpNode* unary = (UnaryOpNode*)node;
             free_ast(unary->operand);
@@ -232,20 +271,18 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = 
-        "// 这是整个文件的头部注释（行首注释）\n" // OK
+        "// 这是头部注释：测试 For 循环和注释功能\n" 
         "int main() { "
-        "  int a = 0; // 定义变量a并初始化（行尾注释）\n" // <--- 加上 \n
-        "  int b = 1; // 定义变量b，值为1 // 注释内再写//也不影响\n" // <--- 加上 \n
-        "  // 这是单独一行的注释，下面的if语句正常执行\n" // <--- 加上 \n
-        "  if (a == 0 || b == 1) {" 
-        "     a = 10; // 满足条件，a赋值为10\n" // <--- 加上 \n
+        "  int sum = 0; // 定义累加变量\n" 
+        "  "
+        "  // 开始循环：从 0 加到 4\n"
+        "  for (int i = 0; i < 5; i = i + 1) { "
+        "    sum = sum + i; // 累加过程\n" 
         "  } "
-        "  if (a == 10 && b == 0) { " 
-        "     a = 20; "
-        "  } "
-        "  printf(\"Hello TinyC! Number: %d\\n\", a); // 输出a的值\n" // <--- 加上 \n
-        "  return 0; // 函数返回0 // 注释结尾\n" // <--- 关键！必须加上 \n
-        "}"; // 现在 } 位于新的一行，安全了
+        "  "
+        "  printf(\"Sum is: %d\\n\", sum); // 输出结果，预期是 10\n"
+        "  return 0; // 返回结果\n"
+        "}"; // 这里的 } 必须在上一行的 \n 之后
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);

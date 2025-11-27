@@ -20,6 +20,7 @@ typedef enum {
     NODE_FUNCTION_CALL,     // 函数调用 add(1, 2)
     NODE_ARRAY_ACCESS,      // 数组访问 a[i]
     NODE_STRING_LITERAL,    // string, such as: "Hello"
+    NODE_FOR_STATEMENT,     // for 语句
 } NodeType;
 
 // AST 节点的通用结构体
@@ -130,6 +131,15 @@ typedef struct {
     int original_id; // [关键] 用于代码生成时标记它是第几个字符串 (.LC0, .LC1...)
 } StringLiteralNode;
 
+// for 语句节点
+typedef struct {
+    NodeType type;             // NODE_FOR_STATEMENT
+    struct ASTNode* init;      // int i = 0;
+    struct ASTNode* condition; // i < 10;
+    struct ASTNode* increment; // i = i + 1;
+    struct ASTNode* body;      // { ... }
+} ForStatementNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -146,8 +156,9 @@ WhileStatementNode* create_while_statement_node(ASTNode* condition, ASTNode* bod
 UnaryOpNode* create_unary_op_node(TokenType op, ASTNode* operand);
 FunctionCallNode* create_function_call_node(char* name, struct ASTNode** args, int arg_count);
 ArrayAccessNode* create_array_access_node(char* name, struct ASTNode* index);
+StringLiteralNode* create_string_literal_node(char* value);
 
 // 新工厂函数
-StringLiteralNode* create_string_literal_node(char* value);
+ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNode* inc, ASTNode* body);
 
 #endif // AST_H

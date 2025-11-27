@@ -2,6 +2,7 @@
 #include "codegen.h"
 #include <string.h>
 
+static void scan_locals(ASTNode* node, int* current_stack_offset);
 // 一个全局计数器，用于生成唯一的标签
 static int label_counter = 0;
 
@@ -152,25 +153,7 @@ static void codegen_function_declaration(FunctionDeclarationNode* node) {
     }
 
     // 1.2 再处理函数体内的局部变量
-    // (这部分逻辑和你之前写的差不多，遍历 body 找 VarDecl)
-    for (int i = 0; i < node->body->count; i++) {
-        if (node->body->statements[i]->type == NODE_VAR_DECL) {
-            VarDeclNode* var = (VarDeclNode*)node->body->statements[i];
-            
-            // 计算这个变量占用的大小
-            int size = 8; // 默认为 8 字节
-            if (var->array_size > 0) {
-                size = var->array_size * 8; // 数组大小 * 8
-            }
-
-            current_stack_offset += size; // 累加
-            
-            // 记录符号
-            symbol_table[symbol_count].name = var->name;
-            symbol_table[symbol_count].stack_offset = current_stack_offset;
-            symbol_count++;
-        }
-    }
+    scan_locals((ASTNode*)node->body, &current_stack_offset);
 
     // 1.3 分配栈空间 (16字节对齐)
     int stack_size = (current_stack_offset + 15) / 16 * 16;
@@ -601,6 +584,88 @@ static void codegen_string_literal(StringLiteralNode* node) {
     printf("  lea rax, [rip + .LC%d]\n", id);
 }
 
+// 递归扫描 AST，查找所有的变量声明 (包括嵌套在 for/if/while 里的)
+static void scan_locals(ASTNode* node, int* current_stack_offset) {
+    if (node == NULL) return;
+
+    switch (node->type) {
+        case NODE_VAR_DECL: {
+            VarDeclNode* var = (VarDeclNode*)node;
+            // 计算大小（保留之前的数组逻辑）
+            int size = 8;
+            if (var->array_size > 0) {
+                size = var->array_size * 8;
+            }
+            *current_stack_offset += size;
+            
+            // 注册到符号表
+            symbol_table[symbol_count].name = var->name;
+            symbol_table[symbol_count].stack_offset = *current_stack_offset;
+            symbol_count++;
+            break;
+        }
+        case NODE_BLOCK_STATEMENT: {
+            BlockStatementNode* block = (BlockStatementNode*)node;
+            for (int i = 0; i < block->count; i++) {
+                scan_locals(block->statements[i], current_stack_offset);
+            }
+            break;
+        }
+        case NODE_IF_STATEMENT: {
+            IfStatementNode* stmt = (IfStatementNode*)node;
+            scan_locals(stmt->body, current_stack_offset);
+            scan_locals(stmt->else_branch, current_stack_offset);
+            break;
+        }
+        case NODE_WHILE_STATEMENT: {
+            WhileStatementNode* stmt = (WhileStatementNode*)node;
+            scan_locals(stmt->body, current_stack_offset);
+            break;
+        }
+        case NODE_FOR_STATEMENT: { // <--- 关键！钻进 For 循环
+            ForStatementNode* stmt = (ForStatementNode*)node;
+            scan_locals(stmt->init, current_stack_offset); // 扫描 int i=0
+            scan_locals(stmt->body, current_stack_offset); // 扫描循环体
+            // cond 和 inc 通常不包含变量声明，可以不扫
+            break;
+        }
+        default:
+            // 其他节点（如表达式）通常不包含变量声明，跳过
+            break;
+    }
+}
+
+static void codegen_for_statement(ForStatementNode* node) {
+    int label_id = label_counter++;
+
+    // 1. 生成初始化代码 (只执行一次)
+    if (node->init) codegen_node(node->init);
+
+    // 2. 循环开始标签
+    printf(".L_start_%d:\n", label_id);
+
+    // 3. 条件检查
+    if (node->condition) {
+        codegen_node(node->condition);
+        printf("  cmp rax, 0\n");
+        printf("  je .L_end_%d\n", label_id); // 为假跳出
+    }
+
+    // 4. 循环体
+    codegen_node(node->body);
+
+    // 5. 递增代码 (执行完 body 后执行)
+    if (node->increment) {
+        codegen_node(node->increment);
+    }
+
+    // 6. 跳回开始
+    printf("  jmp .L_start_%d\n", label_id);
+
+    // 7. 结束标签
+    printf(".L_end_%d:\n", label_id);
+}
+
 /**
  * @brief 递归的 AST 节点访问者函数。
  * 
@@ -657,6 +722,9 @@ static void codegen_node(ASTNode* node) {
         }
         case NODE_STRING_LITERAL:
             codegen_string_literal((StringLiteralNode*)node);
+            break;
+        case NODE_FOR_STATEMENT:
+            codegen_for_statement((ForStatementNode*)node);
             break;
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
