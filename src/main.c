@@ -266,29 +266,48 @@ void free_ast(ASTNode* node) {
     free(node);
 }
 
+char* read_file(const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error: Could not open file '%s'\n", filename);
+        exit(1);
+    }
+
+    // 1. 移动指针到文件末尾，获取文件大小
+    fseek(file, 0, SEEK_END);
+    long length = ftell(file);
+    fseek(file, 0, SEEK_SET); // 移回开头
+
+    // 2. 分配内存 (多 1 字节放字符串结束符 \0)
+    char* buffer = (char*)malloc(length + 1);
+    if (!buffer) {
+        fprintf(stderr, "Error: Could not allocate memory for file content\n");
+        exit(1);
+    }
+
+    // 3. 读取内容
+    fread(buffer, 1, length, file);
+    buffer[length] = '\0'; // 加上结束符
+
+    fclose(file);
+    return buffer;
+}
+
 // -----------
 // 主函数
 // -----------
-int main() {
-    char* source_code = 
-        "// 测试高级循环控制：break 和 continue\n"
-        "int main() { "
-        "  int sum = 0; // 累加结果\n"
-        "  "
-        "  // 循环 0 到 9\n"
-        "  for (int i = 0; i < 10; i = i + 1) { "
-        "    if (i == 5) { "
-        "      continue; // i为5时跳过本次循环，不累加\n"
-        "    } "
-        "    if (i == 8) { "
-        "      break; // i为8时直接终止整个循环\n"
-        "    } "
-        "    sum = sum + i; // 累加: 0+1+2+3+4+6+7 = 23\n"
-        "  } "
-        "  "
-        "  printf(\"Sum is: %d\\n\", sum); // 预期输出 23\n"
-        "  return 0; // 返回退出码 23\n"
-        "}"; // 安全闭合
+int main(int argc, char** argv) {
+    char* source_code = NULL;
+
+    if (argc >= 2) {
+        // 如果命令行提供了文件名: ./tinyc tests/test.c
+        source_code = read_file(argv[1]);
+    } else {
+        // 如果没提供，为了方便调试，我们可以给个默认路径，或者报错
+        // 这里我们默认读取 tests/test.c，省得你每次都要输参数
+        printf("Usage: %s <filename>\nUsing default: tests/test.c\n", argv[0]);
+        source_code = read_file("tests/test.c");
+    }
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);
