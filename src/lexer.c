@@ -28,10 +28,12 @@ Token* get_next_token() {
     if (source_code[current_pos] == '\0') {
         return create_token(TOKEN_EOF, "");
     }
-
+    // 跳过空白符
     while(isspace(source_code[current_pos])){
         current_pos++;
     }
+
+
 
     if (source_code[current_pos] == '\0') {
         return create_token(TOKEN_EOF, "");
@@ -57,6 +59,35 @@ Token* get_next_token() {
         strncpy(num_str, source_code + start, len);
         num_str[len] = '\0';
         return create_token(TOKEN_INT, num_str);
+    }
+
+    if (source_code[current_pos] == '/') {
+        
+        // 1. 单行注释 //
+        if (source_code[current_pos + 1] == '/') {
+            current_pos += 2;
+            // 一直吃到换行符或文件结束
+            while (source_code[current_pos] != '\n' && source_code[current_pos] != '\0') {
+                current_pos++;
+            }
+            // 递归调用自己，获取注释后面的下一个 Token
+            return get_next_token(); 
+        }
+        
+        // 2. 多行注释 /* ... */
+        if (source_code[current_pos + 1] == '*') {
+            current_pos += 2;
+            // 一直吃，直到遇到 */
+            while (source_code[current_pos] != '\0') {
+                if (source_code[current_pos] == '*' && source_code[current_pos + 1] == '/') {
+                    current_pos += 2; // 跳过 */
+                    break;
+                }
+                current_pos++;
+            }
+            // 递归调用自己
+            return get_next_token();
+        }
     }
 
     // 1. 识别单字符 Token: '(', ')', ';'

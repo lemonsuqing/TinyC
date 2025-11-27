@@ -232,18 +232,20 @@ void free_ast(ASTNode* node) {
 // -----------
 int main() {
     char* source_code = 
+        "// 这是整个文件的头部注释（行首注释）\n" // OK
         "int main() { "
-        "  int a = 0; "
-        "  int b = 1; "
-        "  if (a == 0 || b == 1) { " // True || True -> True
-        "     a = 10; "
+        "  int a = 0; // 定义变量a并初始化（行尾注释）\n" // <--- 加上 \n
+        "  int b = 1; // 定义变量b，值为1 // 注释内再写//也不影响\n" // <--- 加上 \n
+        "  // 这是单独一行的注释，下面的if语句正常执行\n" // <--- 加上 \n
+        "  if (a == 0 || b == 1) {" 
+        "     a = 10; // 满足条件，a赋值为10\n" // <--- 加上 \n
         "  } "
-        "  if (a == 10 && b == 0) { " // True && False -> False
+        "  if (a == 10 && b == 0) { " 
         "     a = 20; "
         "  } "
-        "  printf(\"Hello TinyC! Number: %d\\n\", a); "
-        "  return 0; " // 预期返回 10
-        "}";
+        "  printf(\"Hello TinyC! Number: %d\\n\", a); // 输出a的值\n" // <--- 加上 \n
+        "  return 0; // 函数返回0 // 注释结尾\n" // <--- 关键！必须加上 \n
+        "}"; // 现在 } 位于新的一行，安全了
     // printf("--- 正在分析 ---\n%s\n\n", source_code);
     
     lexer_init(source_code);
