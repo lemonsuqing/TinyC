@@ -264,6 +264,62 @@ static void codegen_numeric_literal(NumericLiteralNode* node) {
 
 // 为 "Binary Operation" 节点生成代码
 static void codegen_binary_op(BinaryOpNode* node) {
+    // --- 特殊处理逻辑与 (&&) ---
+    if (node->op == TOKEN_LOGIC_AND) {
+        int label_id = label_counter++; // 申请一个唯一ID
+        
+        // 1. 计算左边
+        codegen_node(node->left);
+        // 结果在 rax。如果 rax == 0 (False)，直接跳到 End，并且结果就是 0
+        printf("  cmp rax, 0\n");
+        printf("  je .L_false_%d\n", label_id); // 短路跳转
+        
+        // 2. 如果左边是 True，才计算右边
+        codegen_node(node->right);
+        printf("  cmp rax, 0\n");
+        printf("  je .L_false_%d\n", label_id);
+        
+        // 3. 如果两边都不跳，说明都是 True
+        printf("  mov rax, 1\n");
+        printf("  jmp .L_end_%d\n", label_id);
+        
+        // 4. False 标签
+        printf(".L_false_%d:\n", label_id);
+        printf("  mov rax, 0\n");
+        
+        // 5. End 标签
+        printf(".L_end_%d:\n", label_id);
+        return; // 处理完毕，直接返回
+    }
+
+    // --- 特殊处理逻辑或 (||) ---
+    if (node->op == TOKEN_LOGIC_OR) {
+        int label_id = label_counter++;
+        
+        // 1. 计算左边
+        codegen_node(node->left);
+        // 如果 rax != 0 (True)，直接跳到 True，结果就是 1
+        printf("  cmp rax, 0\n");
+        printf("  jne .L_true_%d\n", label_id); // 短路跳转
+        
+        // 2. 如果左边是 False，才计算右边
+        codegen_node(node->right);
+        printf("  cmp rax, 0\n");
+        printf("  jne .L_true_%d\n", label_id);
+        
+        // 3. 如果两边都没跳，说明都是 False
+        printf("  mov rax, 0\n");
+        printf("  jmp .L_end_%d\n", label_id);
+        
+        // 4. True 标签
+        printf(".L_true_%d:\n", label_id);
+        printf("  mov rax, 1\n");
+        
+        // 5. End 标签
+        printf(".L_end_%d:\n", label_id);
+        return;
+    }
+
     if (node->op == TOKEN_ASSIGN) {
         // 1. 计算左边的地址 (L-value)，压栈
         // 比如左边是 x，rax 就得到 &x

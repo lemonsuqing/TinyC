@@ -31,6 +31,8 @@ typedef enum {
     TOKEN_LBRACKET,     // [
     TOKEN_RBRACKET,     // ]
     TOKEN_STRING,       // string, such as :"Hello"
+    TOKEN_LOGIC_AND,    // &&
+    TOKEN_LOGIC_OR,     // ||
 } TokenType;
 
 typedef struct {

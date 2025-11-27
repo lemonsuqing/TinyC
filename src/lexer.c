@@ -147,8 +147,23 @@ Token* get_next_token() {
     }
 
     if (source_code[current_pos] == '&') {
+        if (source_code[current_pos + 1] == '&') {
+            current_pos += 2;
+            return create_token(TOKEN_LOGIC_AND, "&&");
+        }
         current_pos++;
         return create_token(TOKEN_AMPERSAND, "&");
+    }
+
+    // 处理 | (目前只有 ||，单竖线是位运算，以后再说)
+    if (source_code[current_pos] == '|') {
+        if (source_code[current_pos + 1] == '|') {
+            current_pos += 2;
+            return create_token(TOKEN_LOGIC_OR, "||");
+        }
+        // 如果只有一个 |，暂时当作未知或者位运算
+        current_pos++;
+        return create_token(TOKEN_UNKNOWN, "|");
     }
 
 

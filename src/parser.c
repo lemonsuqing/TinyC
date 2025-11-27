@@ -24,6 +24,8 @@ ASTNode* parse_assignment_statement();
 ASTNode* parse_while_statement();
 ASTNode* parse_unary();
 ASTNode** parse_parameter_list(int* count);
+ASTNode* parse_logical_or();
+ASTNode* parse_logical_and();
 
 // -----------
 // 辅助函数
@@ -217,9 +219,40 @@ ASTNode* parse_comparison_expression() {
     return left;
 }
 
-// 把 parse_expression 作为总入口
+// 1. 最顶层的 parse_expression 现在指向 logical_or (优先级最低)
 ASTNode* parse_expression() {
-    return parse_comparison_expression();
+    return parse_logical_or();
+}
+
+// 2. 解析 ||
+ASTNode* parse_logical_or() {
+    // 先解析优先级更高的 &&
+    ASTNode* left = parse_logical_and();
+
+    while (current_token->type == TOKEN_LOGIC_OR) {
+        TokenType op = current_token->type;
+        eat(TOKEN_LOGIC_OR);
+        ASTNode* right = parse_logical_and();
+        // 仍然使用 BinaryOpNode，因为结构是一样的，只是 op 不同
+        left = (ASTNode*)create_binary_op_node(left, op, right);
+    }
+    return left;
+}
+
+// 3. 解析 &&
+ASTNode* parse_logical_and() {
+    // 先解析优先级更高的比较运算 (==, !=, <, >)
+    // 注意：你之前的 parse_comparison_expression 包含了 == 和 < 等
+    // 如果你没有把 == 和 < 分开，那就直接调 parse_comparison_expression
+    ASTNode* left = parse_comparison_expression();
+
+    while (current_token->type == TOKEN_LOGIC_AND) {
+        TokenType op = current_token->type;
+        eat(TOKEN_LOGIC_AND);
+        ASTNode* right = parse_comparison_expression();
+        left = (ASTNode*)create_binary_op_node(left, op, right);
+    }
+    return left;
 }
 
 // 解析变量声明语句: "int" <identifier> "=" <expression> ";"
