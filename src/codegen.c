@@ -15,6 +15,7 @@ static int label_counter = 0;
 typedef struct {
     char* name;
     int stack_offset; // 变量在栈上的偏移量
+    int type;   // 0: int, 1: char (对应 DataType 枚举)
 } Symbol;
 
 Symbol symbol_table[100]; // 假设最多100个局部变量
@@ -181,39 +182,38 @@ static void codegen_function_declaration(FunctionDeclarationNode* node) {
 
 // 为 "Variable Declaration" 节点生成代码
 static void codegen_variable_declaration(VarDeclNode* node) {
-    // TODO:
-    // 1. 为等号右边的表达式生成代码 (调用 codegen_node(node->initial_value))
-    //    执行后，表达式的结果会存放在 eax 寄存器中。
-    // 2. 从符号表中查找变量的偏移量。
-    // 3. 生成 mov 指令，将 eax 中的值存到栈上对应的位置。
-    //    printf("  mov DWORD PTR [rbp-%d], eax\n", offset);
-
-    // 1. 为等号右边的表达式生成代码 (调用 codegen_node)。
-    //    执行后，表达式的结果会存放在 eax 寄存器中。
+    // 1. 计算右值 (rax)
     codegen_node(node->initial_value);
 
-    // 2. 从符号表中查找变量的偏移量。
+    // 2. 找符号
     Symbol* symbol = find_symbol(node->name);
-    if (symbol == NULL) {
-        fprintf(stderr, "Codegen Error: Undefined variable '%s'\n", node->name);
-        exit(1);
-    }
+    // Error checking...
 
-    // 3. 生成 mov 指令，将 eax 中的值存到栈上对应的位置。
-    //    e.g., mov DWORD PTR [rbp-8], eax
-    printf("  mov [rbp-%d], rax\n", symbol->stack_offset);
+    // 3. 根据类型存储
+    if (symbol->type == TYPE_CHAR) {
+        // [新增] 存 1 字节
+        printf("  mov byte ptr [rbp-%d], al\n", symbol->stack_offset);
+    } else {
+        // [原有] 存 8 字节
+        printf("  mov [rbp-%d], rax\n", symbol->stack_offset);
+    }
 }
+    
 
 // 为 "Identifier" (变量使用) 节点生成代码
 static void codegen_identifier(IdentifierNode* node) {
-    // 1. 先尝试在局部符号表中查找
     Symbol* symbol = find_symbol(node->name);
     
-    if (symbol != NULL) {
-        // 局部变量 -> 从栈加载
-        printf("  mov rax, [rbp-%d]\n", symbol->stack_offset);
+    if (symbol) {
+        if (symbol->type == TYPE_CHAR) {
+            // [新增] 读 1 字节并零扩展
+            printf("  movzx rax, byte ptr [rbp-%d]\n", symbol->stack_offset);
+        } else {
+            // [原有] 读 8 字节
+            printf("  mov rax, [rbp-%d]\n", symbol->stack_offset);
+        }
     } else {
-        // 全局变量 -> 从数据段加载
+        // 全局变量处理... 暂时假设全局只有 int，或者你也得给全局变量表加类型
         printf("  mov rax, [rip + %s]\n", node->name);
     }
 }
@@ -309,19 +309,29 @@ static void codegen_binary_op(BinaryOpNode* node) {
     }
 
     if (node->op == TOKEN_ASSIGN) {
-        // 1. 计算左边的地址 (L-value)，压栈
-        // 比如左边是 x，rax 就得到 &x
-        // 比如左边是 *p，rax 就得到 p 的值
-        gen_lvalue(node->left);
-        printf("  push rax\n"); // 保存地址
-
-        // 2. 计算右边的值 (R-value)
+        // 1. 生成右值 (value) -> rax
         codegen_node(node->right);
-        // 此时 rax 是右边的值 (例如 20)
+        printf("  push rax\n");
 
-        // 3. 赋值
-        printf("  pop rdi\n");      // 弹出的地址放到 rdi
-        printf("  mov [rdi], rax\n"); // 把值写入该地址
+        // 2. 生成左值 (address) -> rax
+        gen_lvalue(node->left); 
+        printf("  pop rdi\n"); // rdi = value, rax = address
+
+        // 3. 检查左值的类型
+        // 这里我们需要知道 node->left 是什么类型。
+        // 如果它是 IDENTIFIER，我们可以查符号表。
+        if (node->left->type == NODE_IDENTIFIER) {
+            IdentifierNode* ident = (IdentifierNode*)node->left;
+            Symbol* sym = find_symbol(ident->name);
+            if (sym && sym->type == TYPE_CHAR) {
+                // char 类型赋值：只写 1 字节
+                printf("  mov [rax], dil\n"); // dil 是 rdi 的低8位
+                return;
+            }
+        }
+        
+        // 默认 int 赋值
+        printf("  mov [rax], rdi\n");
         return;
     }
 
@@ -608,6 +618,7 @@ static void scan_locals(ASTNode* node, int* current_stack_offset) {
             // 注册到符号表
             symbol_table[symbol_count].name = var->name;
             symbol_table[symbol_count].stack_offset = *current_stack_offset;
+            symbol_table[symbol_count].type = var->var_type;
             symbol_count++;
             break;
         }

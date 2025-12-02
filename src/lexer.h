@@ -33,6 +33,7 @@ typedef enum {
     TOKEN_STRING,       // string, such as :"Hello"
     TOKEN_LOGIC_AND,    // &&
     TOKEN_LOGIC_OR,     // ||
+    TOKEN_CHAR,         // 'A'
 } TokenType;
 
 typedef struct {

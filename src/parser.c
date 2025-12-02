@@ -32,6 +32,26 @@ ASTNode* parse_logical_and();
 // 辅助函数
 // -----------
 
+
+// ===
+
+// 解析类型关键字
+DataType parse_type() {
+    if (current_token->type == TOKEN_KEYWORD) {
+        if (strcmp(current_token->value, "int") == 0) {
+            eat(TOKEN_KEYWORD);
+            return TYPE_INT;
+        }
+        if (strcmp(current_token->value, "char") == 0) {
+            eat(TOKEN_KEYWORD);
+            return TYPE_CHAR;
+        }
+    }
+    fprintf(stderr, "Syntax Error: Expected type specifier (int, char)\n");
+    exit(1);
+    return TYPE_INT;
+}
+
 static void eat(TokenType type) {
     if (current_token->type == type) {
         // 对于需要其值的Token (如INT, IDENTIFIER)，它的value指针已经被AST节点接管，
@@ -125,6 +145,12 @@ ASTNode* parse_factor() {
         char* val = current_token->value;
         eat(TOKEN_STRING);
         return (ASTNode*)create_string_literal_node(val);
+    }
+    else if (type == TOKEN_CHAR) {
+        // Lexer 已经把 'A' 变成了 "65"，直接当数字节点创建即可
+        ASTNode* node = (ASTNode*)create_numeric_literal(current_token->value);
+        eat(TOKEN_CHAR);
+        return node;
     }
     else {
         fprintf(stderr, "Syntax Error: Expected number, identifier or '(', but got token type %d\n", type);
@@ -258,8 +284,8 @@ ASTNode* parse_logical_and() {
 
 // 解析变量声明语句: "int" <identifier> "=" <expression> ";"
 ASTNode* parse_variable_declaration() {
-    eat(TOKEN_KEYWORD); // 吃掉 "int"
-    
+    DataType var_type = parse_type(); // 吃掉 "int"、"char"
+
     char* variable_name = current_token->value;
     eat(TOKEN_IDENTIFIER);
 
@@ -289,7 +315,7 @@ ASTNode* parse_variable_declaration() {
     }
 
     // 传入 array_size 参数
-    return (ASTNode*)create_var_decl_node(variable_name, expr, array_size);
+    return (ASTNode*)create_var_decl_node(variable_name, expr, array_size, var_type);
 }
 
 // 解析返回语句: "return" <expression> ";"
@@ -335,7 +361,8 @@ ASTNode* parse_statement() {
         return parse_return_statement();
     }
     // 如果是 "int" 关键字，说明这是一个变量声明
-    if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "int") == 0) {
+    if (current_token->type == TOKEN_KEYWORD && 
+       (strcmp(current_token->value, "int") == 0 || strcmp(current_token->value, "char") == 0)) {
         return parse_variable_declaration();
     }
 
@@ -416,10 +443,10 @@ ASTNode* parse_block_statement() {
 
 // 新函数：用于解析顶层内容（可能是函数，可能是全局变量）
 ASTNode* parse_top_level() {
-    // 1. 既然是顶层，开头肯定是类型关键字 "int"
-    eat(TOKEN_KEYWORD); 
+    // 1. 先解析类型
+    DataType type = parse_type();
 
-    // 2. 接着是名字
+    // 2. 名字
     char* name = current_token->value;
     eat(TOKEN_IDENTIFIER);
 
@@ -467,7 +494,7 @@ ASTNode* parse_top_level() {
         }
         
         // 传入 array_size
-        return (ASTNode*)create_var_decl_node(name, init_expr, array_size);
+        return (ASTNode*)create_var_decl_node(name, init_expr, array_size, type);
     }
 }
 
@@ -484,7 +511,7 @@ ASTNode** parse_parameter_list(int* count) {
     // 类似于 do-while 结构，处理 "类型 变量名" + ","
     while (1) {
         // 1. 解析类型 (int)
-        eat(TOKEN_KEYWORD); // 假设只能是 int
+        DataType type = parse_type();
 
         // 2. 解析参数名
         char* param_name = current_token->value;
@@ -492,7 +519,7 @@ ASTNode** parse_parameter_list(int* count) {
 
         // 3. 创建参数节点 (复用 VarDeclNode，虽然没有初始值，但在 AST 中可以视作声明)
         // 注意：这里 initial_value 传 NULL
-        VarDeclNode* param = create_var_decl_node(param_name, NULL, 0);
+        VarDeclNode* param = create_var_decl_node(param_name, NULL, 0, type);
 
         // 4. 添加到数组
         (*count)++;
@@ -707,13 +734,14 @@ void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl) {
 }
 
 // 创建一个 “变量声明” 节点
-VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size){
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size, DataType var_type){
     VarDeclNode* node = (VarDeclNode*)malloc(sizeof(VarDeclNode));
     if (!node) { exit(1); }
     node->type = NODE_VAR_DECL;
     node->name = name;                      // 接管 name 指针
     node->initial_value = initial_value;    // 接管 body 指针
     node->array_size = array_size;
+    node->var_type = var_type;
     return node;
 }
 

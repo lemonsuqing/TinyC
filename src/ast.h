@@ -25,6 +25,13 @@ typedef enum {
     NODE_CONTINUE,          // continue
 } NodeType;
 
+// 数据类型枚举
+typedef enum {
+    TYPE_INT,
+    TYPE_CHAR,
+    // 未来可以在这里加 TYPE_VOID, TYPE_STRUCT 等
+} DataType;
+
 // AST 节点的通用结构体
 // 所有具体的节点都会包含这个作为头部，以便我们识别它的类型
 typedef struct ASTNode {
@@ -87,6 +94,7 @@ typedef struct {
     char* name;
     ASTNode* initial_value; // 赋值的初始值表达式
     int array_size;  // 0 表示标量，>0 表示数组大小
+    DataType var_type;
 } VarDeclNode;
 
 // 二元运算符结点
@@ -158,7 +166,7 @@ ProgramNode* create_program_node();
 FunctionDeclarationNode* create_function_declaration_node(char* name, struct ASTNode** args, int arg_count, BlockStatementNode* body);
 ReturnStatementNode* create_return_statement_node(ASTNode* argument);
 void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl);
-VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size);
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size, DataType var_type);
 IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
 IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);

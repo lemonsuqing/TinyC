@@ -197,6 +197,32 @@ Token* get_next_token() {
         return create_token(TOKEN_UNKNOWN, "|");
     }
 
+    if (source_code[current_pos] == '\'') {
+        current_pos++; // 吃掉开头的 '
+        char c = source_code[current_pos];
+        
+        // 简单的转义支持 (可选，先支持 '\n' 吧)
+        if (c == '\\') {
+            current_pos++;
+            if (source_code[current_pos] == 'n') c = 10; // 换行符
+            else if (source_code[current_pos] == '0') c = 0; // null
+            // 其他转义暂略
+        }
+        current_pos++; // 吃掉字符
+        
+        if (source_code[current_pos] != '\'') {
+            fprintf(stderr, "Error: Expected closing single quote.\n");
+            exit(1);
+        }
+        current_pos++; // 吃掉结尾的 '
+
+        // 将字符转换为字符串形式的数字返回 (例如 'A' -> "65")
+        // 这样 parser 把它当数字处理就行，方便！
+        char* val = malloc(4);
+        sprintf(val, "%d", (int)c);
+        return create_token(TOKEN_CHAR, val);
+    }
+
 
     // 2. 识别标识符和关键字
     // C 语言的标识符以字母或下划线开头
@@ -216,7 +242,8 @@ Token* get_next_token() {
         // d. 检查这个字符串是不是关键字
         //    - 如果是，返回一个 TOKEN_KEYWORD 类型的 Token
         //    - 如果不是，返回一个 TOKEN_IDENTIFIER 类型的 Token
-        if (strcmp(str, "int") == 0 || 
+        if (strcmp(str, "int") == 0 ||  
+            strcmp(str, "char") == 0 ||
             strcmp(str, "return") == 0 || 
             strcmp(str, "if") == 0 || 
             strcmp(str, "else") == 0 ||
