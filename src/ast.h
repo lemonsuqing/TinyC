@@ -4,6 +4,9 @@
 #include <stdlib.h> // 为了 size_t
 #include "lexer.h"
 
+#define MAX_MEMBERS 20
+#define MAX_STRUCTS 20
+
 typedef enum {
     NODE_NUMERIC_LITERAL,   // 数字字面量
     NODE_BLOCK_STATEMENT,   // 代码块语句 { ... }
@@ -23,12 +26,14 @@ typedef enum {
     NODE_FOR_STATEMENT,     // for 语句
     NODE_BREAK,             // break
     NODE_CONTINUE,          // continue
+    NODE_MEMBER_ACCESS,
 } NodeType;
 
 // 数据类型枚举
 typedef enum {
     TYPE_INT,
     TYPE_CHAR,
+    TYPE_STRUCT,
     // 未来可以在这里加 TYPE_VOID, TYPE_STRUCT 等
 } DataType;
 
@@ -95,6 +100,7 @@ typedef struct {
     ASTNode* initial_value; // 赋值的初始值表达式
     int array_size;  // 0 表示标量，>0 表示数组大小
     DataType var_type;
+    char* struct_name; // 如果是结构体变量，记录是哪个结构体 (如 "Point")
 } VarDeclNode;
 
 // 二元运算符结点
@@ -158,6 +164,35 @@ typedef struct {
     NodeType type;
 } ContinueNode;
 
+typedef struct {
+    char* name;
+    DataType type;
+    int offset; // 成员相对于结构体起始位置的偏移量
+} MemberInfo;
+
+typedef struct {
+    char* name;
+    MemberInfo members[MAX_MEMBERS];
+    int member_count;
+    int size;   // 总大小 (字节)
+} StructDef;
+
+extern StructDef struct_table[MAX_STRUCTS];
+extern int struct_count;
+
+// 辅助函数：定义结构体、查找结构体、查找成员
+StructDef* define_struct(char* name);
+void add_struct_member(StructDef* s, char* member_name, DataType type);
+StructDef* find_struct(char* name);
+MemberInfo* find_struct_member(StructDef* s, char* member_name);
+
+// 新增：成员访问节点 p.x
+typedef struct {
+    NodeType type;      // NODE_MEMBER_ACCESS
+    char* struct_var_name; // 变量名 "p"
+    char* member_name;     // 成员名 "x"
+} MemberAccessNode;
+
 // 原有工厂函数
 NumericLiteralNode* create_numeric_literal(char* value);
 BlockStatementNode* create_block_statement();
@@ -166,7 +201,7 @@ ProgramNode* create_program_node();
 FunctionDeclarationNode* create_function_declaration_node(char* name, struct ASTNode** args, int arg_count, BlockStatementNode* body);
 ReturnStatementNode* create_return_statement_node(ASTNode* argument);
 void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl);
-VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size, DataType var_type);
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size, DataType var_type, char* struct_name);
 IdentifierNode* create_identifier_node(char* name);
 BinaryOpNode* create_binary_op_node(ASTNode* left, TokenType op, ASTNode* right);
 IfStatementNode* create_if_statement_node(ASTNode* condition, ASTNode* body, ASTNode* else_branch);
@@ -176,9 +211,10 @@ FunctionCallNode* create_function_call_node(char* name, struct ASTNode** args, i
 ArrayAccessNode* create_array_access_node(char* name, struct ASTNode* index);
 StringLiteralNode* create_string_literal_node(char* value);
 ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNode* inc, ASTNode* body);
-
-// 新工厂函数
 ASTNode* create_break_node();
 ASTNode* create_continue_node();
+
+// 新工厂函数
+MemberAccessNode* create_member_access_node(char* var_name, char* member_name);
 
 #endif // AST_H

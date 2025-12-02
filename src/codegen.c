@@ -16,6 +16,7 @@ typedef struct {
     char* name;
     int stack_offset; // 变量在栈上的偏移量
     int type;   // 0: int, 1: char (对应 DataType 枚举)
+    char* struct_name;
 } Symbol;
 
 Symbol symbol_table[100]; // 假设最多100个局部变量
@@ -588,6 +589,35 @@ static void gen_lvalue(ASTNode* node) {
         }
     }
 
+    if (node->type == NODE_MEMBER_ACCESS) {
+        MemberAccessNode* access = (MemberAccessNode*)node;
+        
+        // 1. 找结构体变量 p
+        Symbol* sym = find_symbol(access->struct_var_name);
+        if (!sym) { /* Error */ }
+        
+        // 2. 找结构体定义 Point
+        StructDef* sdef = find_struct(sym->struct_name);
+        if (!sdef) { /* Error */ }
+        
+        // 3. 找成员 x
+        MemberInfo* mem = find_struct_member(sdef, access->member_name);
+        if (!mem) { /* Error */ }
+        
+        // 4. 计算地址
+        // Addr = rbp - sym->offset + mem->offset
+        // 注意：栈是向下增长的。
+        // 如果 p 在 rbp-16 (size 16)，那么 p 的首地址其实是 rbp-16。
+        // p.x (offset 0) -> rbp-16
+        // p.y (offset 8) -> rbp-16 + 8 = rbp-8
+        
+        printf("  mov rax, rbp\n");
+        printf("  sub rax, %d\n", sym->stack_offset); // Base address
+        printf("  add rax, %d\n", mem->offset);       // Member offset
+        
+        return; // rax 是地址
+    }
+
     fprintf(stderr, "Error: Left side of assignment must be a variable or pointer dereference.\n");
     exit(1);
 }
@@ -619,6 +649,7 @@ static void scan_locals(ASTNode* node, int* current_stack_offset) {
             symbol_table[symbol_count].name = var->name;
             symbol_table[symbol_count].stack_offset = *current_stack_offset;
             symbol_table[symbol_count].type = var->var_type;
+            symbol_table[symbol_count].struct_name = var->struct_name;
             symbol_count++;
             break;
         }
@@ -776,6 +807,12 @@ static void codegen_node(ASTNode* node) {
         case NODE_CONTINUE:
             codegen_continue(node);
             break;
+        case NODE_MEMBER_ACCESS: {
+            // 读取 p.x 的值
+            gen_lvalue(node);
+            printf("  mov rax, [rax]\n");
+            break;
+        }
         default:
             fprintf(stderr, "Codegen Error: Unknown AST node type %d\n", node->type);
             exit(1);

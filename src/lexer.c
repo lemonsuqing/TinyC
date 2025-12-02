@@ -130,6 +130,10 @@ Token* get_next_token() {
         current_pos++;
         return create_token(TOKEN_RBRACKET, "]");
     }
+    if (source_code[current_pos] == '.') {
+        current_pos++;
+        return create_token(TOKEN_DOT, ".");
+    }
 
     // 处理 = 和 ==
     if (source_code[current_pos] == '=') {
@@ -250,7 +254,8 @@ Token* get_next_token() {
             strcmp(str, "while") == 0 || 
             strcmp(str, "for") == 0 ||
             strcmp(str, "break") == 0 ||
-            strcmp(str, "continue") == 0) 
+            strcmp(str, "continue") == 0 || 
+            strcmp(str, "struct") == 0) 
         {
             return create_token(TOKEN_KEYWORD, str);
         } else {

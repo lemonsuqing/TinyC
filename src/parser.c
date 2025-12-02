@@ -27,6 +27,7 @@ ASTNode* parse_unary();
 ASTNode** parse_parameter_list(int* count);
 ASTNode* parse_logical_or();
 ASTNode* parse_logical_and();
+void parse_struct_definition();
 
 // -----------
 // 辅助函数
@@ -105,6 +106,14 @@ ASTNode* parse_factor() {
         // 这里的 trick：我们先保存名字，eat(ID)，然后看 current_token
         char* name = current_token->value;
         eat(TOKEN_IDENTIFIER);
+
+        if (current_token->type == TOKEN_DOT) {
+            // --- 处理 p.x ---
+            eat(TOKEN_DOT);
+            char* member_name = current_token->value;
+            eat(TOKEN_IDENTIFIER);
+            return (ASTNode*)create_member_access_node(name, member_name);
+        }
 
         if (current_token->type == TOKEN_LPAREN) {
             // --- 这是函数调用 ---
@@ -284,6 +293,28 @@ ASTNode* parse_logical_and() {
 
 // 解析变量声明语句: "int" <identifier> "=" <expression> ";"
 ASTNode* parse_variable_declaration() {
+    // 检查是不是 struct 关键字
+    if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "struct") == 0) {
+        eat(TOKEN_KEYWORD);
+        char* struct_name = current_token->value;
+        eat(TOKEN_IDENTIFIER);
+        char* var_name = current_token->value;
+        eat(TOKEN_IDENTIFIER);
+        eat(TOKEN_SEMICOLON);
+        
+        // 查找结构体定义，获取大小
+        StructDef* s = find_struct(struct_name);
+        if (!s) { fprintf(stderr, "Undefined struct %s\n", struct_name); exit(1); }
+        
+        // 我们利用 array_size 字段来存结构体大小？
+        // 或者使用上面新增的 array_size 来存总字节数？
+        // 这里的技巧是：把结构体当成一个巨大的 int 数组或者 byte 数组处理
+        // 传入 struct_name
+        return (ASTNode*)create_var_decl_node(var_name, NULL, s->size / 8, TYPE_STRUCT, struct_name); 
+        // 注意：这里我复用了 array_size 字段来告诉 codegen 分配多少个 8字节。
+        // 你也可以在 VarDeclNode 里加个 size 字段更清晰。
+    }
+
     DataType var_type = parse_type(); // 吃掉 "int"、"char"
 
     char* variable_name = current_token->value;
@@ -315,7 +346,7 @@ ASTNode* parse_variable_declaration() {
     }
 
     // 传入 array_size 参数
-    return (ASTNode*)create_var_decl_node(variable_name, expr, array_size, var_type);
+    return (ASTNode*)create_var_decl_node(variable_name, expr, array_size, var_type, NULL);
 }
 
 // 解析返回语句: "return" <expression> ";"
@@ -362,7 +393,9 @@ ASTNode* parse_statement() {
     }
     // 如果是 "int" 关键字，说明这是一个变量声明
     if (current_token->type == TOKEN_KEYWORD && 
-       (strcmp(current_token->value, "int") == 0 || strcmp(current_token->value, "char") == 0)) {
+       (strcmp(current_token->value, "int") == 0 || 
+        strcmp(current_token->value, "char") == 0 ||
+        strcmp(current_token->value, "struct") == 0)) {
         return parse_variable_declaration();
     }
 
@@ -441,8 +474,37 @@ ASTNode* parse_block_statement() {
     return (ASTNode*)block_node;
 }
 
+void parse_struct_definition() {
+    eat(TOKEN_KEYWORD); // struct
+    char* struct_name = current_token->value;
+    eat(TOKEN_IDENTIFIER);
+    eat(TOKEN_LBRACE); // {
+    
+    StructDef* s = define_struct(struct_name);
+    
+    // 解析成员
+    while (current_token->type != TOKEN_RBRACE) {
+        // 简化：成员只能是 int x; 或 char y; 不支持嵌套 struct
+        DataType type = parse_type();
+        char* mem_name = current_token->value;
+        eat(TOKEN_IDENTIFIER);
+        eat(TOKEN_SEMICOLON);
+        
+        add_struct_member(s, mem_name, type);
+    }
+    
+    eat(TOKEN_RBRACE); // }
+    eat(TOKEN_SEMICOLON); // ;
+}
+
 // 新函数：用于解析顶层内容（可能是函数，可能是全局变量）
 ASTNode* parse_top_level() {
+    // --- 新增：检查是不是 struct 定义 ---
+    if (current_token->type == TOKEN_KEYWORD && strcmp(current_token->value, "struct") == 0) {
+        parse_struct_definition();
+        return NULL; // <--- 关键！返回 NULL 表示这只是元数据定义，不是可执行代码
+    }
+
     // 1. 先解析类型
     DataType type = parse_type();
 
@@ -494,7 +556,7 @@ ASTNode* parse_top_level() {
         }
         
         // 传入 array_size
-        return (ASTNode*)create_var_decl_node(name, init_expr, array_size, type);
+        return (ASTNode*)create_var_decl_node(name, init_expr, array_size, type, NULL);
     }
 }
 
@@ -519,7 +581,7 @@ ASTNode** parse_parameter_list(int* count) {
 
         // 3. 创建参数节点 (复用 VarDeclNode，虽然没有初始值，但在 AST 中可以视作声明)
         // 注意：这里 initial_value 传 NULL
-        VarDeclNode* param = create_var_decl_node(param_name, NULL, 0, type);
+        VarDeclNode* param = create_var_decl_node(param_name, NULL, 0, type, NULL);
 
         // 4. 添加到数组
         (*count)++;
@@ -651,7 +713,9 @@ ASTNode* parse() {
     while (current_token->type != TOKEN_EOF) {
         // [修改后] 调用新的通用解析函数
         ASTNode* node = parse_top_level();
-        add_declaration_to_program(prog, node);
+        if (node != NULL) {
+            add_declaration_to_program(prog, node);
+        }
     }
     
     return (ASTNode*)prog;
@@ -734,7 +798,7 @@ void add_declaration_to_program(ProgramNode* prog, struct ASTNode* decl) {
 }
 
 // 创建一个 “变量声明” 节点
-VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size, DataType var_type){
+VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_size, DataType var_type, char* struct_name){
     VarDeclNode* node = (VarDeclNode*)malloc(sizeof(VarDeclNode));
     if (!node) { exit(1); }
     node->type = NODE_VAR_DECL;
@@ -742,6 +806,7 @@ VarDeclNode* create_var_decl_node(char* name, ASTNode* initial_value, int array_
     node->initial_value = initial_value;    // 接管 body 指针
     node->array_size = array_size;
     node->var_type = var_type;
+    node->struct_name = struct_name;
     return node;
 }
 
@@ -816,6 +881,7 @@ StringLiteralNode* create_string_literal_node(char* value) {
 
 ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNode* inc, ASTNode* body) {
     ForStatementNode* node = malloc(sizeof(ForStatementNode));
+    if (!node) exit(1);
     node->type = NODE_FOR_STATEMENT;
     node->init = init;
     node->condition = cond;
@@ -826,11 +892,74 @@ ForStatementNode* create_for_statement_node(ASTNode* init, ASTNode* cond, ASTNod
 
 ASTNode* create_break_node() {
     ASTNode* node = malloc(sizeof(ASTNode));
+    if (!node) exit(1);
     node->type = NODE_BREAK;
     return node;
 }
 ASTNode* create_continue_node() {
     ASTNode* node = malloc(sizeof(ASTNode));
+    if (!node) exit(1);
     node->type = NODE_CONTINUE;
+    return node;
+}
+
+StructDef struct_table[MAX_STRUCTS];
+int struct_count = 0;
+
+// 定义一个新的结构体
+StructDef* define_struct(char* name) {
+    if (struct_count >= MAX_STRUCTS) {
+        fprintf(stderr, "Error: Too many structs defined.\n");
+        exit(1);
+    }
+    StructDef* s = &struct_table[struct_count++];
+    s->name = name;
+    s->member_count = 0;
+    s->size = 0;
+    return s;
+}
+
+// 向结构体添加成员
+void add_struct_member(StructDef* s, char* member_name, DataType type) {
+    if (s->member_count >= MAX_MEMBERS) {
+        fprintf(stderr, "Error: Too many members in struct %s.\n", s->name);
+        exit(1);
+    }
+    MemberInfo* m = &s->members[s->member_count++];
+    m->name = member_name;
+    m->type = type;
+    
+    // 简化处理：目前所有成员（包括 char）都按 8 字节对齐分配
+    // 这样 Codegen 计算地址最简单
+    m->offset = s->size; 
+    s->size += 8; 
+}
+
+// 查找结构体定义
+StructDef* find_struct(char* name) {
+    for(int i=0; i<struct_count; i++) {
+        if(strcmp(struct_table[i].name, name) == 0) {
+            return &struct_table[i];
+        }
+    }
+    return NULL;
+}
+
+// 查找结构体成员
+MemberInfo* find_struct_member(StructDef* s, char* member_name) {
+    for(int i=0; i<s->member_count; i++) {
+        if(strcmp(s->members[i].name, member_name) == 0) {
+            return &s->members[i];
+        }
+    }
+    return NULL;
+}
+
+MemberAccessNode* create_member_access_node(char* var_name, char* member_name) {
+    MemberAccessNode* node = (MemberAccessNode*)malloc(sizeof(MemberAccessNode));
+    if (!node) { exit(1); }
+    node->type = NODE_MEMBER_ACCESS;
+    node->struct_var_name = var_name;
+    node->member_name = member_name;
     return node;
 }
